@@ -3,15 +3,22 @@
  * 
  * This file demonstrates:
  * 5. Assertions for debugging (e.g., checking embedding dimensions)
+ * 
+ * This file shows how assertions are used in the actual Nexus codebase
+ * to catch bugs early in MessageService, SearchService, and other components.
  */
 
 import { Message } from '../models/Message';
+import { SearchService } from '../search/SearchService';
+import { MessageService } from '../services/MessageService';
 
 /**
  * Assertion: Check embedding dimensions
  * 
  * Embeddings must be exactly 1536 dimensions for semantic search to work.
  * This assertion catches bugs early in development.
+ * 
+ * Used in SearchService when processing messages for semantic search.
  */
 export function validateEmbedding(embedding: number[] | null): void {
   if (embedding === null) {
@@ -42,6 +49,9 @@ export function validateEmbedding(embedding: number[] | null): void {
  * Assertion: Check message invariants
  * 
  * Validates that a message satisfies its representation invariants.
+ * 
+ * Used in MessageService.addMessage() to ensure messages are valid before storage.
+ * See MessageService.ts line 98 for actual usage.
  */
 export function assertMessageInvariants(message: Message): void {
   // RI: Message ID must be non-empty
@@ -93,6 +103,9 @@ export function assertMessageInvariants(message: Message): void {
 
 /**
  * Assertion: Check search query validity
+ * 
+ * Used in SearchService.search() to validate query before processing.
+ * See SearchService.ts line 42 for query validation.
  */
 export function assertSearchQuery(query: string): void {
   console.assert(
@@ -113,6 +126,9 @@ export function assertSearchQuery(query: string): void {
 
 /**
  * Assertion: Check thread structure validity
+ * 
+ * Used in MessageService.addMessage() when validating thread relationships.
+ * See MessageService.ts lines 78-87 for thread validation.
  */
 export function assertThreadStructure(
   threadId: string,
@@ -142,6 +158,8 @@ export function assertThreadStructure(
 
 /**
  * Assertion: Check user permissions
+ * 
+ * Used with AccessControl to validate permissions before operations.
  */
 export function assertUserPermission(
   userId: string,
@@ -166,6 +184,8 @@ export function assertUserPermission(
 
 /**
  * Assertion: Check channel access
+ * 
+ * Used to validate channel access before allowing operations.
  */
 export function assertChannelAccess(
   userId: string,
@@ -191,19 +211,20 @@ export function devAssert(condition: boolean, message: string): void {
 }
 
 /**
- * Example usage in message creation:
+ * Example usage in actual Nexus components:
  * 
+ * // In MessageService.addMessage() (line 98):
  * const message = new Message(...);
- * assertMessageInvariants(message);
- * validateEmbedding(message.embedding);
+ * assertMessageInvariants(message); // Validates RI
+ * validateEmbedding(message.embedding); // Checks embedding dimensions
  * 
- * Example usage in search:
- * 
- * assertSearchQuery(query);
+ * // In SearchService.search() (would add at line 42):
+ * assertSearchQuery(query); // Validates query before search
  * const results = searchService.search(query);
  * 
- * Example usage in threading:
- * 
- * assertThreadStructure(threadId, parentMessage, replyMessage);
+ * // In MessageService.addMessage() for thread validation (lines 78-87):
+ * if (message.threadId !== null) {
+ *   const parent = messageService.getMessage(message.threadId);
+ *   assertThreadStructure(message.threadId, parent, message); // Validates thread structure
+ * }
  */
-

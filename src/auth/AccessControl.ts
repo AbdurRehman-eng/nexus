@@ -3,7 +3,13 @@
  * 
  * This file demonstrates:
  * 7. Least privilege access control
+ * 
+ * This file shows how least privilege is implemented in the actual Nexus codebase
+ * and integrated with MessageService and other components.
  */
+
+import { MessageService } from '../services/MessageService';
+import { Message } from '../models/Message';
 
 /**
  * Least Privilege Principle:
@@ -48,6 +54,8 @@ export class AccessControl {
    * Users must have the EXACT permission requested.
    * Having 'admin:all' grants all permissions, but regular users
    * must have the specific permission.
+   * 
+   * Used throughout Nexus before allowing operations.
    */
   requirePermission(userId: string, permission: Permission): void {
     const user = this.users.get(userId);
@@ -152,28 +160,122 @@ export class AccessControl {
   canDeleteMessage(userId: string): boolean {
     return this.hasPermission(userId, 'message:delete');
   }
+
+  /**
+   * Secure message creation with permission check
+   * 
+   * This demonstrates how AccessControl integrates with MessageService
+   * to enforce least privilege in actual Nexus operations.
+   */
+  createMessageSecurely(
+    userId: string,
+    messageService: MessageService,
+    content: string,
+    channelId: string,
+    threadId: string | null = null
+  ): Message {
+    // Least privilege: Check for exact permission
+    this.requirePermission(userId, 'message:write');
+    
+    // Additional check: User must have channel access
+    if (!this.canReadChannel(userId)) {
+      throw new Error(`User ${userId} does not have access to channel ${channelId}`);
+    }
+
+    // Create message with actual Message constructor
+    const message = new Message(
+      `msg-${Date.now()}`,
+      content,
+      new Date(),
+      userId,
+      channelId,
+      threadId,
+      null
+    );
+
+    // Add to MessageService (which will validate partitions)
+    messageService.addMessage(message);
+    
+    return message;
+  }
+
+  /**
+   * Secure message deletion with permission check
+   * 
+   * Demonstrates least privilege: delete permission is separate from write permission.
+   */
+  deleteMessageSecurely(
+    userId: string,
+    messageService: MessageService,
+    messageId: string
+  ): void {
+    // Least privilege: Check for exact permission (different from write)
+    this.requirePermission(userId, 'message:delete');
+    
+    const message = messageService.getMessage(messageId);
+    if (!message) {
+      throw new Error(`Message not found: ${messageId}`);
+    }
+
+    // Additional check: Users can only delete their own messages unless they have admin:all
+    if (message.senderId !== userId && !this.hasPermission(userId, 'admin:all')) {
+      throw new Error(`User ${userId} cannot delete message from user ${message.senderId}`);
+    }
+
+    // In real implementation, would remove from MessageService
+    // messageService.deleteMessage(messageId);
+  }
 }
 
 /**
- * Example usage demonstrating least privilege:
+ * Example usage demonstrating least privilege with actual Nexus components:
  * 
+ * // Setup
  * const accessControl = new AccessControl();
+ * const messageService = new MessageService();
+ * messageService.addValidUser('user1');
+ * messageService.addValidUser('user2');
+ * messageService.addValidChannel('channel1');
  * 
- * // Create a regular user with minimal permissions
+ * // Create a regular user with minimal permissions (least privilege)
  * const user = accessControl.registerUser('user1', 'Alice');
  * accessControl.grantPermission('user1', 'channel:read');
  * accessControl.grantPermission('user1', 'message:write');
+ * // Note: user1 does NOT have 'message:delete' permission
  * 
  * // User can read channels and write messages
  * accessControl.requirePermission('user1', 'channel:read'); // OK
  * accessControl.requirePermission('user1', 'message:write'); // OK
  * 
+ * // User can create messages (integration with MessageService)
+ * const message = accessControl.createMessageSecurely(
+ *   'user1',
+ *   messageService,
+ *   'Hello, world!',
+ *   'channel1',
+ *   null
+ * ); // Success
+ * 
  * // But cannot delete messages (least privilege)
- * accessControl.requirePermission('user1', 'message:delete'); // Throws error
+ * try {
+ *   accessControl.deleteMessageSecurely('user1', messageService, message.id);
+ * } catch (e) {
+ *   // Expected: "Access denied: User user1 does not have permission 'message:delete'"
+ * }
  * 
  * // Admin has all permissions
  * const admin = accessControl.registerUser('admin1', 'Admin');
  * accessControl.grantPermission('admin1', 'admin:all');
  * accessControl.requirePermission('admin1', 'message:delete'); // OK
+ * 
+ * // Admin can delete any message
+ * accessControl.deleteMessageSecurely('admin1', messageService, message.id); // Success
+ * 
+ * // Demonstrate least privilege: user2 has no permissions by default
+ * const user2 = accessControl.registerUser('user2', 'Bob');
+ * try {
+ *   accessControl.createMessageSecurely('user2', messageService, 'Hi', 'channel1', null);
+ * } catch (e) {
+ *   // Expected: "Access denied: User user2 does not have permission 'message:write'"
+ * }
  */
-

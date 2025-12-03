@@ -3,6 +3,9 @@
  * 
  * This file demonstrates:
  * 1. Abstraction Function (AF) and Representation Invariant (RI)
+ * 
+ * This file shows how AF and RI are implemented in the actual Nexus codebase
+ * and how they ensure correctness as the system grows.
  */
 
 /**
@@ -20,7 +23,7 @@
  */
 export class Message {
   private readonly _id: string;
-  private readonly _content: string;
+  private readonly _content: string; // Immutable - prevents mutation that would break SearchService.keywordMatch()
   private readonly _timestamp: Date; // Immutable - RI requirement
   private readonly _senderId: string; // Must be valid user ID - RI requirement
   private readonly _channelId: string; // Must be valid channel ID - RI requirement
@@ -72,7 +75,12 @@ export class Message {
   }
 
   get timestamp(): Date {
-    return new Date(this._timestamp.getTime()); // Return defensive copy - RI enforcement
+    // Return defensive copy - RI enforcement
+    // MUTATION RISK: If we returned this._timestamp directly, external code could mutate it:
+    //   const ts = message.timestamp; ts.setFullYear(2025); // Would break MessageService thread ordering!
+    // This would cause messages to appear out of chronological order in threads.
+    // See MessageService.addMessage() line 88-90 for thread validation that relies on immutable timestamps.
+    return new Date(this._timestamp.getTime());
   }
 
   get senderId(): string {
@@ -88,7 +96,12 @@ export class Message {
   }
 
   get embedding(): number[] | null {
-    return this._embedding ? [...this._embedding] : null; // Return defensive copy - RI enforcement
+    // Return defensive copy - RI enforcement
+    // MUTATION RISK: If we returned this._embedding directly, external code could mutate it:
+    //   const emb = message.embedding; emb[0] = 999; // Would break SearchService semantic search!
+    // This would cause SearchService.semanticMatch() (line 93-104 in SearchService.ts) to produce
+    // incorrect similarity scores, making search results inconsistent.
+    return this._embedding ? [...this._embedding] : null;
   }
 
   /**
@@ -116,3 +129,36 @@ export class Message {
   }
 }
 
+/**
+ * Example usage in Nexus components:
+ * 
+ * // Used in MessageService.addMessage() (see MessageService.ts line 59)
+ * const message = new Message(
+ *   'msg-123',
+ *   'Hello, world!',
+ *   new Date('2024-01-01T10:00:00Z'),
+ *   'user1',
+ *   'channel1',
+ *   null, // Not a thread reply
+ *   null // No embedding
+ * );
+ * 
+ * // Used in SearchService for semantic search (see SearchService.ts line 84-95)
+ * const embedding = new Array(1536).fill(0).map(() => Math.random() * 0.1);
+ * const messageWithEmbedding = new Message(
+ *   'msg-124',
+ *   'Searchable content',
+ *   new Date(),
+ *   'user1',
+ *   'channel1',
+ *   null,
+ *   embedding // 1536-dimensional embedding for semantic search
+ * );
+ * 
+ * // Used in thread creation (see MessageService.ts lines 78-87)
+ * const parent = new Message('msg-125', 'Question?', new Date(), 'user1', 'channel1', null);
+ * const reply = new Message('msg-126', 'Answer', new Date(), 'user2', 'channel1', 'msg-125');
+ * 
+ * // AF ensures: All these Message objects represent the abstract concept of "a user sending text"
+ * // RI ensures: All invariants are validated and preserved (immutable, valid IDs, correct dimensions)
+ */

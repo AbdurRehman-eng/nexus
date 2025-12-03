@@ -3,6 +3,9 @@
  * 
  * This file demonstrates:
  * 2. Declarative specification for search(query)
+ * 
+ * This file shows how declarative specifications are implemented in the actual Nexus codebase
+ * and how they enable switching from keyword to semantic search.
  */
 
 import { Message } from '../models/Message';
@@ -37,6 +40,8 @@ export class SearchService {
    * 
    * The implementation can use keyword search, semantic search, or both,
    * but the specification remains the same.
+   * 
+   * This method is used throughout Nexus for message search functionality.
    */
   search(query: string): Message[] {
     if (!query || query.trim().length === 0) {
@@ -69,8 +74,14 @@ export class SearchService {
 
   /**
    * keywordMatch: Implementation detail - not part of the declarative spec
+   * 
+   * Uses actual Message.content from Message objects in the system.
    */
   private keywordMatch(message: Message, query: string): boolean {
+    // MUTATION RISK: This relies on message.content being immutable.
+    // If content were mutable and changed after indexing, search results would show
+    // messages that don't match the displayed content (e.g., search for "hello" returns
+    // a message that was mutated to say "goodbye"). Message.content is readonly (Message.ts line 23).
     const queryLower = query.toLowerCase();
     return message.content.toLowerCase().includes(queryLower);
   }
@@ -80,6 +91,8 @@ export class SearchService {
    * 
    * This demonstrates that the declarative specification allows different
    * implementations without affecting callers.
+   * 
+   * Uses actual Message.embedding from Message objects in the system.
    */
   private semanticMatch(message: Message, query: string): boolean {
     // This would use semanticSearch(query) internally
@@ -89,13 +102,21 @@ export class SearchService {
       return false;
     }
     
+    // MUTATION RISK: This relies on message.embedding being immutable.
+    // If embedding were mutable and changed after indexing, similarity calculations would be wrong,
+    // causing search to return incorrect matches. Message.embedding getter returns defensive copy
+    // (Message.ts line 93-94) to prevent this risk.
     // Placeholder: In real implementation, would compute similarity
     // between message.embedding and query embedding
+    // Uses actual Message.embedding which must be 1536 dimensions (enforced by Message constructor)
     return this.keywordMatch(message, query); // Fallback for now
   }
 
   /**
    * Hybrid search: Another implementation that satisfies the same declarative spec
+   * 
+   * Combines keyword and semantic matching.
+   * Still satisfies: "returns all messages where match(m, query) == true"
    */
   private hybridMatch(message: Message, query: string): boolean {
     // Combines keyword and semantic matching
@@ -105,6 +126,9 @@ export class SearchService {
 
   /**
    * Add message to searchable collection
+   * 
+   * Used by MessageService to index messages for search.
+   * See MessageService.ts line 130 for integration.
    */
   addMessage(message: Message): void {
     this.messages.push(message);
@@ -115,11 +139,29 @@ export class SearchService {
  * Example usage demonstrating that the declarative specification
  * allows implementation changes without affecting callers:
  * 
+ * // Setup with actual Message objects
  * const searchService = new SearchService();
- * const results = searchService.search("hello");
  * 
- * Whether searchService uses keywordMatch(), semanticMatch(), or hybridMatch()
- * internally doesn't matter - the specification guarantees:
- * "returns all messages m where match(m, query) == true"
+ * // Add messages using actual Message constructor
+ * const msg1 = new Message('msg1', 'Hello world', new Date(), 'user1', 'channel1', null);
+ * const msg2 = new Message('msg2', 'Hello there', new Date(), 'user2', 'channel1', null);
+ * const msg3 = new Message('msg3', 'Goodbye', new Date(), 'user1', 'channel1', null);
+ * 
+ * searchService.addMessage(msg1);
+ * searchService.addMessage(msg2);
+ * searchService.addMessage(msg3);
+ * 
+ * // Search works the same regardless of implementation
+ * const results = searchService.search("hello");
+ * // Returns [msg1, msg2] - both contain "hello"
+ * 
+ * // Whether searchService uses keywordMatch(), semanticMatch(), or hybridMatch()
+ * // internally doesn't matter - the specification guarantees:
+ * // "returns all messages m where match(m, query) == true"
+ * 
+ * // To switch to semantic search, just change line 67 from:
+ * // return this.keywordMatch(message, query);
+ * // to:
+ * // return this.semanticMatch(message, query);
+ * // All callers continue to work without changes!
  */
-
