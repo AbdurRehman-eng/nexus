@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
 export async function submitContactForm(name: string, email: string, message: string) {
@@ -27,8 +27,11 @@ export async function submitContactForm(name: string, email: string, message: st
     return { error: 'Message exceeds maximum length (5000 characters)', data: null }
   }
 
-  // Use server client (doesn't require authentication for contact form)
-  const supabase = await createClient()
+  // Use public client with anon key for anonymous inserts
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   const { data, error } = await supabase
     .from('contact_messages')

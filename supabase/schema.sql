@@ -290,8 +290,12 @@ CREATE POLICY "Users can add reactions"
 
 -- RLS Policies for contact_messages
 -- Anyone can submit a contact message (public form)
+-- Explicitly allow both anonymous and authenticated users
+DROP POLICY IF EXISTS "Anyone can submit contact messages" ON public.contact_messages;
 CREATE POLICY "Anyone can submit contact messages"
-  ON public.contact_messages FOR INSERT
+  ON public.contact_messages
+  FOR INSERT
+  TO anon, authenticated
   WITH CHECK (true);
 
 -- Only authenticated users (admins) can view contact messages
