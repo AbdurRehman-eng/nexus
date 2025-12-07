@@ -384,6 +384,75 @@ This principle ensures that security is built into the permission model, not add
 
 ---
 
+### 8. (Code Reviews — Catching Mistakes Early)
+**How can code reviews help catch mistakes early?**
+
+**Answer:**
+Code reviews catch mistakes early by having multiple developers examine code before it's merged. In Nexus, code reviews would catch several types of issues:
+
+1. **Type Mismatches** (MessageService.ts line 31):
+   - **Bug**: `private validChannelIds: Set<string> = new Map();` - declares Set but initializes Map
+   - **Code Review Catch**: Reviewer notices type mismatch between declaration and initialization
+   - **Impact**: Runtime error when trying to use Set methods (like `.has()`) on a Map object
+   - **Fix**: Changed to `new Set<string>()` to match the declaration (see line 31 with comment)
+   - **Prevention**: TypeScript compiler would catch this, but code review ensures intent is correct and catches it before compilation
+
+2. **Missing Validation** (MessageService.ts lines 64-100):
+   - **Potential Bug**: If a developer adds a new partition but forgets to validate it
+   - **Code Review Catch**: Reviewer checks that all 5 partitions are validated
+   - **Impact**: Invalid messages could be stored, breaking system invariants
+   - **Prevention**: Review checklist ensures all partitions are covered
+
+3. **Security Issues** (AccessControl.ts lines 170-200):
+   - **Potential Bug**: If `createMessageSecurely()` didn't check permissions
+   - **Code Review Catch**: Reviewer verifies `requirePermission()` is called before operations
+   - **Impact**: Unauthorized users could create messages, violating least privilege
+   - **Prevention**: Security-focused review ensures all permission checks are present
+
+4. **Missing Defensive Copying** (Message.ts lines 77-79, 93-94):
+   - **Potential Bug**: If getters returned direct references instead of copies
+   - **Code Review Catch**: Reviewer checks for defensive copying in getters
+   - **Impact**: External code could mutate timestamps/embeddings, breaking invariants
+   - **Prevention**: Review ensures immutability is preserved
+
+5. **Incorrect Recursion Base Case** (ThreadDepth.ts lines 42-55):
+   - **Potential Bug**: If base case returned wrong value (e.g., -1 instead of 0)
+   - **Code Review Catch**: Reviewer verifies base case logic matches specification
+   - **Impact**: Thread depth calculations would be wrong, breaking UI rendering
+   - **Prevention**: Review ensures recursive functions have correct base cases
+
+6. **Missing Assertions** (MessageService.ts line 106):
+   - **Potential Bug**: If `assertMessageInvariants()` wasn't called
+   - **Code Review Catch**: Reviewer checks that assertions are used in critical paths
+   - **Impact**: Invalid messages might be stored, causing bugs later
+   - **Prevention**: Review ensures assertions are placed where invariants must hold
+
+7. **Incomplete Partition Testing** (MessageService.ts lines 64-100):
+   - **Potential Bug**: If a partition (e.g., embedding validation) was missing
+   - **Code Review Catch**: Reviewer verifies all documented partitions are tested
+   - **Impact**: Some invalid inputs would be accepted, breaking system correctness
+   - **Prevention**: Review checklist matches documentation to implementation
+
+**Code Review Process in Nexus:**
+- **Before Merge**: All changes reviewed by at least one other developer
+- **Checklist**: Verify type safety, security checks, invariant preservation, test coverage
+- **Examples**: Review MessageService.addMessage() to ensure all 5 partitions are validated
+- **Benefits**: Catches bugs before they reach production, shares knowledge, improves code quality
+
+**Specific Review Points:**
+- Message.ts: Verify all getters return defensive copies (lines 77-79, 93-94)
+- SearchService.ts: Ensure declarative spec is maintained when changing match() (lines 64-68)
+- MessageService.ts: Check all partitions are validated (lines 64-100)
+- AccessControl.ts: Verify permission checks before all operations (lines 170-227)
+- ThreadDepth.ts: Confirm base case and recursive case are correct (lines 42-55)
+
+Code reviews act as a safety net, catching mistakes that automated tools might miss and ensuring code quality before integration.
+
+**Code Snippets:**
+See `docs/code-review-snippets.md` for actual code snippets from Nexus that demonstrate code review checkpoints.
+
+---
+
 ## Additional Files
 
 ### UI Components (Color Scheme Demonstration)

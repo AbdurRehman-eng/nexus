@@ -3,21 +3,35 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signUp, signInWithGoogle } from '@/app/actions/auth';
 
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    // For now, just redirect to homepage
-    router.push('/homepage');
+    setError('');
+    setLoading(true);
+
+    const result = await signUp(email, password);
+    
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+    } else {
+      router.push('/homepage');
+      router.refresh();
+    }
   };
 
-  const handleGoogleLogin = () => {
-    // Placeholder for Google OAuth
-    router.push('/homepage');
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    await signInWithGoogle();
   };
 
   return (
@@ -36,6 +50,11 @@ export default function RegisterPage() {
           <h2 className="text-3xl font-bold text-dark-red mb-8">Create Account</h2>
           
           <form onSubmit={handleRegister} className="space-y-6">
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-input text-sm">
+                {error}
+              </div>
+            )}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address
@@ -48,6 +67,7 @@ export default function RegisterPage() {
                 className="input-field"
                 placeholder="you@example.com"
                 required
+                disabled={loading}
               />
             </div>
 
@@ -63,11 +83,12 @@ export default function RegisterPage() {
                 className="input-field"
                 placeholder="••••••••"
                 required
+                disabled={loading}
               />
             </div>
 
-            <button type="submit" className="btn-primary w-full">
-              Register
+            <button type="submit" className="btn-primary w-full" disabled={loading}>
+              {loading ? 'Creating Account...' : 'Register'}
             </button>
 
             <div className="relative my-6">
@@ -82,7 +103,8 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-3 px-6 py-3 border-2 border-gray-border rounded-button font-semibold hover:bg-light-gray transition-colors"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 px-6 py-3 border-2 border-gray-border rounded-button font-semibold hover:bg-light-gray transition-colors disabled:opacity-50"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path

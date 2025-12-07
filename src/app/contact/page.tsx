@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Navbar from '@/components/Navbar';
+import { submitContactForm } from '@/app/actions/contact';
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({
@@ -10,18 +11,33 @@ export default function ContactPage() {
     message: '',
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate sending message
-    console.log('Form submitted:', formData);
-    setIsSubmitted(true);
-    
-    // Reset form after 3 seconds
-    setTimeout(() => {
+    setError('');
+    setLoading(true);
+
+    const result = await submitContactForm(
+      formData.name,
+      formData.email,
+      formData.message
+    );
+
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+    } else {
+      setIsSubmitted(true);
       setFormData({ name: '', email: '', message: '' });
-      setIsSubmitted(false);
-    }, 3000);
+      
+      // Reset success message after 5 seconds
+      setTimeout(() => {
+        setIsSubmitted(false);
+      }, 5000);
+      setLoading(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -105,6 +121,11 @@ export default function ContactPage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
+                {error && (
+                  <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-input text-sm">
+                    {error}
+                  </div>
+                )}
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                     Name *
@@ -118,6 +139,7 @@ export default function ContactPage() {
                     className="input-field"
                     placeholder="Your name"
                     required
+                    disabled={loading}
                   />
                 </div>
 
@@ -134,6 +156,7 @@ export default function ContactPage() {
                     className="input-field"
                     placeholder="your@email.com"
                     required
+                    disabled={loading}
                   />
                 </div>
 
@@ -150,11 +173,16 @@ export default function ContactPage() {
                     placeholder="Tell us what's on your mind..."
                     rows={6}
                     required
+                    disabled={loading}
                   />
                 </div>
 
-                <button type="submit" className="btn-primary w-full">
-                  Send Message
+                <button 
+                  type="submit" 
+                  className="btn-primary w-full" 
+                  disabled={loading}
+                >
+                  {loading ? 'Sending...' : 'Send Message'}
                 </button>
               </form>
             )}

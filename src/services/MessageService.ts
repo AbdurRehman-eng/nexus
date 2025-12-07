@@ -28,7 +28,7 @@ import { AccessControl, Permission } from '../auth/AccessControl';
 export class MessageService {
   private messages: Map<string, Message> = new Map();
   private validUserIds: Set<string> = new Set();
-  private validChannelIds: Set<string> = new Map();
+  private validChannelIds: Set<string> = new Set(); // CODE REVIEW CATCH: Was incorrectly 'new Map()' - type mismatch!
   private searchService: SearchService | null = null;
   private accessControl: AccessControl | null = null;
 

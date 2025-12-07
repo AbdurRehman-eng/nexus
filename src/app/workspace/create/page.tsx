@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createWorkspace } from '@/app/actions/workspaces';
 
 export default function CreateWorkspace() {
   const router = useRouter();
@@ -10,6 +11,8 @@ export default function CreateWorkspace() {
   const [organizationType, setOrganizationType] = useState<'private' | 'public'>('private');
   const [coworkerEmail, setCoworkerEmail] = useState('');
   const [coworkers, setCoworkers] = useState<string[]>([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleStep1Next = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,10 +32,20 @@ export default function CreateWorkspace() {
     setCoworkers(coworkers.filter((c) => c !== email));
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    // For now, just redirect to homepage
-    router.push('/homepage');
+    setError('');
+    setLoading(true);
+
+    const result = await createWorkspace(workspaceName, organizationType, coworkers);
+    
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+    } else {
+      router.push('/homepage');
+      router.refresh();
+    }
   };
 
   return (
@@ -126,6 +139,11 @@ export default function CreateWorkspace() {
             </form>
           ) : (
             <form onSubmit={handleCreate} className="space-y-6">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-input text-sm">
+                  {error}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Owner (You)
@@ -150,11 +168,13 @@ export default function CreateWorkspace() {
                     onChange={(e) => setCoworkerEmail(e.target.value)}
                     className="input-field"
                     placeholder="coworker@example.com"
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={handleAddCoworker}
-                    className="px-4 py-2 bg-dark-red text-white rounded-button font-semibold hover:bg-maroon"
+                    disabled={loading}
+                    className="px-4 py-2 bg-dark-red text-white rounded-button font-semibold hover:bg-maroon disabled:opacity-50"
                   >
                     Add
                   </button>
@@ -184,11 +204,12 @@ export default function CreateWorkspace() {
                   type="button"
                   onClick={() => setStep(1)}
                   className="btn-secondary flex-1"
+                  disabled={loading}
                 >
                   Back
                 </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Create Workspace
+                <button type="submit" className="btn-primary flex-1" disabled={loading}>
+                  {loading ? 'Creating...' : 'Create Workspace'}
                 </button>
               </div>
             </form>

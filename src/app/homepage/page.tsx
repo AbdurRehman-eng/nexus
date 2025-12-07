@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { getWorkspaces } from '@/app/actions/workspaces';
+import { signOut } from '@/app/actions/auth';
 
 interface Workspace {
   id: string;
@@ -14,15 +16,33 @@ interface Workspace {
 
 export default function Homepage() {
   const router = useRouter();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([
-    {
-      id: '1',
-      name: 'Aurora Digital',
-      owner: 'You',
-      designation: 'Owner',
-      channelsCount: 2,
-    },
-  ]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadWorkspaces();
+  }, []);
+
+  const loadWorkspaces = async () => {
+    setLoading(true);
+    setError('');
+    const result = await getWorkspaces();
+    
+    if (result.error) {
+      setError(result.error);
+      if (result.error === 'Not authenticated') {
+        router.push('/login');
+      }
+    } else {
+      setWorkspaces(result.data || []);
+    }
+    setLoading(false);
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+  };
 
   return (
     <div className="min-h-screen bg-light-gray">
@@ -33,7 +53,7 @@ export default function Homepage() {
           </Link>
           <div className="flex items-center gap-4">
             <button className="text-sm text-gray-700 hover:text-dark-red">Profile</button>
-            <button className="text-sm text-gray-700 hover:text-dark-red">Logout</button>
+            <button onClick={handleLogout} className="text-sm text-gray-700 hover:text-dark-red">Logout</button>
           </div>
         </div>
       </nav>
@@ -42,7 +62,15 @@ export default function Homepage() {
         <h1 className="text-4xl font-bold text-dark-red mb-2">Hi! Welcome Back</h1>
         <p className="text-gray-600 mb-12">Select a workspace or create a new one to get started.</p>
 
-        {workspaces.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="text-gray-600">Loading workspaces...</div>
+          </div>
+        ) : error ? (
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-input">
+            {error}
+          </div>
+        ) : workspaces.length === 0 ? (
           // Empty State
           <div className="flex flex-col items-center justify-center py-24">
             <div className="w-48 h-48 mb-8 flex items-center justify-center">
