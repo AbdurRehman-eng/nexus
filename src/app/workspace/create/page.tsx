@@ -41,27 +41,22 @@ export default function CreateWorkspace() {
     setError('');
     setLoading(true);
 
-    // Simulate API call with dummy data
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const result = await createWorkspace(workspaceName, organizationType, coworkers);
     
-    // For now, just show success message with dummy data
-    console.log('Workspace created (dummy data):', {
-      name: workspaceName,
-      organizationType,
-      coworkers,
-      owner: 'dummy-user@example.com',
-      id: 'dummy-workspace-id-' + Date.now()
-    });
-    
-    // Show success and reset form
-    alert(`Workspace "${workspaceName}" created successfully!\n\nOrganization Type: ${organizationType}\nCoworkers: ${coworkers.length > 0 ? coworkers.join(', ') : 'None'}\n\n(Using dummy data - no backend call)`);
-    
-    // Reset form
-    setWorkspaceName('');
-    setOrganizationType('private');
-    setCoworkers([]);
-    setStep(1);
-    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      setLoading(false);
+    } else {
+      // Show success message
+      alert(`Workspace "${workspaceName}" created successfully!\n\nOrganization Type: ${organizationType}\nCoworkers: ${coworkers.length > 0 ? coworkers.join(', ') : 'None'}\n\nWorkspace has been added to Supabase.`);
+      
+      // Reset form
+      setWorkspaceName('');
+      setOrganizationType('private');
+      setCoworkers([]);
+      setStep(1);
+      setLoading(false);
+    }
   };
 
   return (
@@ -166,7 +161,7 @@ export default function CreateWorkspace() {
                 </label>
                 <input
                   type="email"
-                  value="dummy-user@example.com"
+                  value="shafiqueabdurrehman@gmail.com"
                   className="input-field bg-gray-100"
                   disabled
                 />

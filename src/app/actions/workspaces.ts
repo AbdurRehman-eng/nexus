@@ -6,10 +6,35 @@ import { revalidatePath } from 'next/cache'
 export async function createWorkspace(name: string, organizationType: 'private' | 'public', coworkerEmails: string[] = []) {
   const supabase = await createClient()
 
-  // Get current user
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) {
-    return { error: 'Not authenticated', data: null }
+  // For now, use hardcoded email until login works
+  // TODO: Switch back to authenticated user once login is working
+  const TEMP_OWNER_EMAIL = 'shafiqueabdurrehman@gmail.com'
+  
+  // Try to get authenticated user first
+  const { data: { user: authUser }, error: userError } = await supabase.auth.getUser()
+  
+  let ownerId: string | null = null
+  
+  if (authUser) {
+    // If user is authenticated, use their ID
+    ownerId = authUser.id
+  } else {
+    // If not authenticated, look up user by email from profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', TEMP_OWNER_EMAIL)
+      .single()
+    
+    if (profileError || !profile) {
+      return { error: `User with email ${TEMP_OWNER_EMAIL} not found. Please ensure the user exists in the database.`, data: null }
+    }
+    
+    ownerId = profile.id
+  }
+  
+  if (!ownerId) {
+    return { error: 'Unable to determine workspace owner', data: null }
   }
 
   // Create workspace
@@ -17,7 +42,7 @@ export async function createWorkspace(name: string, organizationType: 'private' 
     .from('workspaces')
     .insert({
       name,
-      owner_id: user.id,
+      owner_id: ownerId,
       organization_type: organizationType,
     })
     .select()
@@ -48,6 +73,15 @@ export async function createWorkspace(name: string, organizationType: 'private' 
     }
   }
 
+  // Add owner as workspace member
+  await supabase
+    .from('workspace_members')
+    .insert({
+      workspace_id: workspace.id,
+      user_id: ownerId,
+      role: 'owner',
+    })
+
   // Create default channel
   const { data: channel } = await supabase
     .from('channels')
@@ -56,7 +90,7 @@ export async function createWorkspace(name: string, organizationType: 'private' 
       name: 'general',
       description: 'General discussion',
       is_private: false,
-      created_by: user.id,
+      created_by: ownerId,
     })
     .select()
     .single()
@@ -67,7 +101,7 @@ export async function createWorkspace(name: string, organizationType: 'private' 
       .from('channel_members')
       .insert({
         channel_id: channel.id,
-        user_id: user.id,
+        user_id: ownerId,
       })
   }
 
