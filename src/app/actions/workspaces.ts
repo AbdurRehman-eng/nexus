@@ -112,23 +112,47 @@ export async function createWorkspace(name: string, organizationType: 'private' 
 export async function getWorkspaces() {
   const supabase = await createClient()
 
+  // Debug: Check cookies first
+  const { cookies } = await import('next/headers')
+  const cookieStore = await cookies()
+  const allCookies = cookieStore.getAll()
+  console.log('[getWorkspaces] Available cookies:', {
+    count: allCookies.length,
+    names: allCookies.map(c => c.name).filter(n => n.includes('supabase') || n.includes('auth'))
+  })
+
   // Debug: Check session first
   const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession()
   console.log('[getWorkspaces] Session check:', { 
     hasSession: !!sessionData, 
     sessionError: sessionError?.message,
-    userId: sessionData?.user?.id 
+    userId: sessionData?.user?.id,
+    expiresAt: sessionData?.expires_at
   })
+
+  // If no session, try refreshing
+  if (!sessionData) {
+    console.log('[getWorkspaces] No session, attempting refresh...')
+    const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
+    console.log('[getWorkspaces] After refresh:', {
+      hasSession: !!refreshedSession,
+      userId: refreshedSession?.user?.id
+    })
+  }
 
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   console.log('[getWorkspaces] User check:', { 
     hasUser: !!user, 
     userError: userError?.message,
-    userId: user?.id 
+    userId: user?.id,
+    email: user?.email
   })
   
   if (userError || !user) {
-    console.log('[getWorkspaces] Auth failed - returning error')
+    console.log('[getWorkspaces] Auth failed - returning error', {
+      userError: userError?.message,
+      hasUser: !!user
+    })
     return { error: 'Not authenticated', data: null }
   }
 

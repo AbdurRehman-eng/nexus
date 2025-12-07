@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { signIn, signInWithGoogle } from '@/app/actions/auth';
+import { signInWithGoogle } from '@/app/actions/auth';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,30 +36,51 @@ export default function LoginPage() {
     }
 
     try {
-      // Use API route for better cookie handling
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include', // Important: include cookies
+      // Use browser client for login - this handles cookies automatically
+      const supabase = createClient();
+      
+      console.log('[Login] Attempting sign in with browser client...');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
       });
 
-      const result = await response.json();
-
-      if (!response.ok || result.error) {
-        setError(result.error || 'Failed to sign in');
+      if (error) {
+        console.error('[Login] Sign in error:', error);
+        if (error.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password');
+        } else {
+          setError(error.message);
+        }
         setLoading(false);
         return;
       }
 
-      console.log('[Login] Sign in successful via API route');
+      if (!data.session) {
+        console.error('[Login] No session in response');
+        setError('Failed to create session. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('[Login] Sign in successful:', {
+        userId: data.session.user.id,
+        expiresAt: data.session.expires_at
+      });
+
+      // Verify session is available
+      const { data: { session: verifiedSession } } = await supabase.auth.getSession();
       
-      // Wait a moment for cookies to be set
-      await new Promise(resolve => setTimeout(resolve, 300));
+      if (!verifiedSession) {
+        console.error('[Login] Session not available after sign in');
+        setError('Session not found. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('[Login] Session verified, redirecting...');
       
-      // Redirect with full page reload to ensure cookies are available
+      // Use full page reload to ensure cookies are available to server
       window.location.href = '/homepage';
     } catch (err) {
       console.error('[Login] Error:', err);
