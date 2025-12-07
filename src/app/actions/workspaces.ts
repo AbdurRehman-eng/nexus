@@ -118,7 +118,14 @@ export async function getWorkspaces() {
   const allCookies = cookieStore.getAll()
   console.log('[getWorkspaces] Available cookies:', {
     count: allCookies.length,
-    names: allCookies.map(c => c.name).filter(n => n.includes('supabase') || n.includes('auth'))
+    allNames: allCookies.map(c => c.name),
+    supabaseCookies: allCookies.filter(c => 
+      c.name.includes('supabase') || 
+      c.name.includes('auth') || 
+      c.name.includes('sb-') ||
+      c.name.includes('access_token') ||
+      c.name.includes('refresh_token')
+    ).map(c => ({ name: c.name, hasValue: !!c.value, valueLength: c.value?.length }))
   })
 
   // Debug: Check session first
