@@ -161,20 +161,37 @@ export default function ContactPage() {
                 </div>
 
                 <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                    Message *
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label htmlFor="message" className="block text-sm font-medium text-gray-700">
+                      Message *
+                    </label>
+                    <div className="text-xs text-gray-500">
+                      <span className={formData.message.length > 5000 ? 'text-red-600 font-semibold' : ''}>
+                        {formData.message.length.toLocaleString()} / 5,000 characters
+                      </span>
+                      {' • '}
+                      <span>
+                        {formData.message.trim() ? formData.message.trim().split(/\s+/).filter(word => word.length > 0).length : 0} words
+                      </span>
+                    </div>
+                  </div>
                   <textarea
                     id="message"
                     name="message"
                     value={formData.message}
                     onChange={handleChange}
-                    className="input-field resize-none"
+                    className={`input-field resize-none ${formData.message.length > 5000 ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
                     placeholder="Tell us what's on your mind..."
                     rows={6}
                     required
                     disabled={loading}
+                    maxLength={5000}
                   />
+                  {formData.message.length > 5000 && (
+                    <p className="mt-1 text-xs text-red-600">
+                      Message exceeds maximum length. Please shorten your message.
+                    </p>
+                  )}
                 </div>
 
                 <button 
