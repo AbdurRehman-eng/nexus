@@ -4,6 +4,10 @@
   "description": "A partial, non-working but structured implementation of a Slack-style clone demonstrating key software engineering concepts",
   "main": "index.js",
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "test": "echo \"This is a non-working implementation for demonstration purposes\""
   },
   "keywords": [
@@ -15,11 +19,22 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@types/react": "^18.0.0",
     "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^15.0.0",
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "react": "^18.0.0"
+    "@heroicons/react": "^2.2.0",
+    "autoprefixer": "^10.4.22",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.556.0",
+    "next": "^15.0.0",
+    "postcss": "^8.4.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "tailwindcss": "^3.4.1"
   }
 }
