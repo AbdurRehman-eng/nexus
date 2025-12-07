@@ -1,21 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, signInWithGoogle } from '@/app/actions/auth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Check for error in URL (from OAuth callback or other redirects)
+  useEffect(() => {
+    const urlError = searchParams.get('error');
+    if (urlError) {
+      setError(decodeURIComponent(urlError));
+      // Clean up URL
+      router.replace('/login');
+    }
+  }, [searchParams, router]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      setLoading(false);
+      return;
+    }
 
     const result = await signIn(email, password);
     
@@ -23,8 +40,11 @@ export default function LoginPage() {
       setError(result.error);
       setLoading(false);
     } else {
-      router.push('/homepage');
-      router.refresh();
+      // Small delay to ensure session is set
+      setTimeout(() => {
+        router.push('/homepage');
+        router.refresh();
+      }, 100);
     }
   };
 

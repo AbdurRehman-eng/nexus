@@ -7,10 +7,16 @@ import { redirect } from 'next/navigation'
 export async function signUp(email: string, password: string, username?: string) {
   const supabase = await createClient()
 
+  // Validate password length
+  if (password.length < 6) {
+    return { error: 'Password must be at least 6 characters long', data: null }
+  }
+
   const { data, error } = await supabase.auth.signUp({
-    email,
+    email: email.trim().toLowerCase(),
     password,
     options: {
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
       data: {
         username: username || email.split('@')[0],
       },
@@ -18,22 +24,47 @@ export async function signUp(email: string, password: string, username?: string)
   })
 
   if (error) {
-    return { error: error.message }
+    return { error: error.message, data: null }
   }
 
-  return { data, error: null }
+  // Check if email confirmation is required
+  if (data.user && !data.session) {
+    return { 
+      data: null, 
+      error: null,
+      requiresConfirmation: true,
+      message: 'Please check your email to confirm your account before signing in.'
+    }
+  }
+
+  revalidatePath('/', 'layout')
+  return { data, error: null, requiresConfirmation: false }
 }
 
 export async function signIn(email: string, password: string) {
   const supabase = await createClient()
 
+  if (!email || !password) {
+    return { error: 'Email and password are required', data: null }
+  }
+
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: email.trim().toLowerCase(),
     password,
   })
 
   if (error) {
-    return { error: error.message }
+    // Provide more user-friendly error messages
+    if (error.message.includes('Invalid login credentials')) {
+      return { error: 'Invalid email or password', data: null }
+    }
+    // Allow sign-in without email verification - removed email confirmation check
+    return { error: error.message, data: null }
+  }
+
+  // Verify session was created
+  if (!data.session) {
+    return { error: 'Failed to create session. Please try again.', data: null }
   }
 
   revalidatePath('/', 'layout')
@@ -54,11 +85,15 @@ export async function signInWithGoogle() {
     provider: 'google',
     options: {
       redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
     },
   })
 
   if (error) {
-    return { error: error.message }
+    return { error: error.message, data: null }
   }
 
   if (data.url) {

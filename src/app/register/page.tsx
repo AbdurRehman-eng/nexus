@@ -17,12 +17,25 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
 
+    // Basic password validation
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+
     const result = await signUp(email, password);
     
     if (result.error) {
       setError(result.error);
       setLoading(false);
+    } else if (result.requiresConfirmation) {
+      // Show success message if email confirmation is required
+      setError('');
+      alert(result.message || 'Please check your email to confirm your account before signing in.');
+      router.push('/login');
     } else {
+      // User is automatically signed in
       router.push('/homepage');
       router.refresh();
     }
