@@ -133,14 +133,19 @@ CREATE POLICY "Owners can update their workspaces"
   USING (auth.uid() = owner_id);
 
 -- RLS Policies for workspace_members
+-- Fix: Check workspaces table first to avoid infinite recursion
 CREATE POLICY "Users can view members of their workspaces"
   ON public.workspace_members FOR SELECT
   USING (
+    -- User is the owner of the workspace
     EXISTS (
-      SELECT 1 FROM public.workspace_members wm
-      WHERE wm.workspace_id = workspace_members.workspace_id
-      AND wm.user_id = auth.uid()
+      SELECT 1 FROM public.workspaces
+      WHERE workspaces.id = workspace_members.workspace_id
+      AND workspaces.owner_id = auth.uid()
     )
+    OR
+    -- User is viewing their own membership record
+    workspace_members.user_id = auth.uid()
   );
 
 CREATE POLICY "Workspace owners can add members"
