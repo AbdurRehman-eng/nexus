@@ -70,11 +70,21 @@ export async function signIn(email: string, password: string) {
 
   // Verify session was created
   if (!data.session) {
+    console.log('[signIn] No session in response');
     return { error: 'Failed to create session. Please try again.', data: null }
   }
 
+  console.log('[signIn] Session created:', {
+    userId: data.session.user.id,
+    expiresAt: data.session.expires_at
+  });
+
   // Ensure session is properly set by refreshing
-  await supabase.auth.getSession()
+  const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.getSession()
+  console.log('[signIn] Session refresh:', {
+    hasSession: !!refreshedSession,
+    refreshError: refreshError?.message
+  });
   
   revalidatePath('/', 'layout')
   revalidatePath('/homepage')

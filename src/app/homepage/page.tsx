@@ -22,47 +22,96 @@ export default function Homepage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // First check if user is authenticated before loading workspaces
-    checkAuthAndLoad();
+    // Wait for page to fully load and cookies to be available
+    const timer = setTimeout(() => {
+      checkAuthAndLoad();
+    }, 200);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   const checkAuthAndLoad = async () => {
     setLoading(true);
     setError('');
     
-    // Try to load workspaces directly - server action will handle auth check
-    // If it fails, then check client-side session
-    const result = await getWorkspaces();
+    console.log('[Homepage] Starting auth check...');
+    
+    // First check client-side session - this is the source of truth
+    const supabase = createClient();
+    let clientSession = null;
+    let retries = 5;
+    
+    // Wait for session to be available (with retries)
+    while (!clientSession && retries > 0) {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      clientSession = session;
+      
+      console.log(`[Homepage] Client session check (attempt ${6 - retries}):`, {
+        hasSession: !!session,
+        sessionError: sessionError?.message,
+        userId: session?.user?.id
+      });
+      
+      if (!clientSession && retries > 1) {
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      retries--;
+    }
+    
+    if (!clientSession) {
+      console.log('[Homepage] No client session after all retries - redirecting to login');
+      window.location.href = '/login';
+      return;
+    }
+    
+    console.log('[Homepage] Client session confirmed, waiting for server cookies...');
+    // Wait for cookies to propagate to server (important after redirect)
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Now try to load workspaces - server action will handle auth check
+    console.log('[Homepage] Calling getWorkspaces...');
+    let result = await getWorkspaces();
+    
+    console.log('[Homepage] getWorkspaces result:', {
+      hasError: !!result.error,
+      error: result.error,
+      hasData: !!result.data,
+      dataLength: result.data?.length
+    });
+    
+    // If server says not authenticated but we have client session, retry with delays
+    if (result.error && result.error === 'Not authenticated') {
+      console.log('[Homepage] Server auth failed but client has session - retrying...');
+      
+      for (let i = 0; i < 3; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        result = await getWorkspaces();
+        console.log(`[Homepage] Retry ${i + 1} result:`, {
+          hasError: !!result.error,
+          error: result.error
+        });
+        
+        if (!result.error || result.error !== 'Not authenticated') {
+          break; // Success or different error
+        }
+      }
+    }
     
     if (result.error && result.error === 'Not authenticated') {
-      // Server says not authenticated, verify on client side with retry
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        // No session found, redirect to login
-        window.location.href = '/login';
-        return;
-      }
-      
-      // Session exists on client but server doesn't see it - retry once
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const retryResult = await getWorkspaces();
-      
-      if (retryResult.error && retryResult.error === 'Not authenticated') {
-        window.location.href = '/login';
-        return;
-      }
-      
-      // Retry succeeded
-      setWorkspaces(retryResult.data || []);
+      // Even after retries, server doesn't see session
+      // But client has session, so show empty state instead of redirecting
+      console.log('[Homepage] Server still says not authenticated, but client has session - showing empty state');
+      setError('Unable to load workspaces. Please refresh the page.');
+      setWorkspaces([]);
       setLoading(false);
+      return;
     } else if (result.error) {
+      console.log('[Homepage] Other error:', result.error);
       setError(result.error);
       setLoading(false);
     } else {
+      console.log('[Homepage] Success - setting workspaces');
       setWorkspaces(result.data || []);
       setLoading(false);
     }

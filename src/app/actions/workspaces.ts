@@ -78,8 +78,23 @@ export async function createWorkspace(name: string, organizationType: 'private' 
 export async function getWorkspaces() {
   const supabase = await createClient()
 
+  // Debug: Check session first
+  const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession()
+  console.log('[getWorkspaces] Session check:', { 
+    hasSession: !!sessionData, 
+    sessionError: sessionError?.message,
+    userId: sessionData?.user?.id 
+  })
+
   const { data: { user }, error: userError } = await supabase.auth.getUser()
+  console.log('[getWorkspaces] User check:', { 
+    hasUser: !!user, 
+    userError: userError?.message,
+    userId: user?.id 
+  })
+  
   if (userError || !user) {
+    console.log('[getWorkspaces] Auth failed - returning error')
     return { error: 'Not authenticated', data: null }
   }
 
