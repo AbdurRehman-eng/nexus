@@ -21,9 +21,13 @@ export default function CreateWorkspace() {
     }
   };
 
-  const handleAddCoworker = () => {
-    if (coworkerEmail.trim() && !coworkers.includes(coworkerEmail)) {
-      setCoworkers([...coworkers, coworkerEmail]);
+  const handleAddCoworker = (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    const email = coworkerEmail.trim().toLowerCase();
+    if (email && !coworkers.includes(email)) {
+      setCoworkers([...coworkers, email]);
       setCoworkerEmail('');
     }
   };
@@ -37,15 +41,27 @@ export default function CreateWorkspace() {
     setError('');
     setLoading(true);
 
-    const result = await createWorkspace(workspaceName, organizationType, coworkers);
+    // Simulate API call with dummy data
+    await new Promise(resolve => setTimeout(resolve, 1000));
     
-    if (result.error) {
-      setError(result.error);
-      setLoading(false);
-    } else {
-      router.push('/homepage');
-      router.refresh();
-    }
+    // For now, just show success message with dummy data
+    console.log('Workspace created (dummy data):', {
+      name: workspaceName,
+      organizationType,
+      coworkers,
+      owner: 'dummy-user@example.com',
+      id: 'dummy-workspace-id-' + Date.now()
+    });
+    
+    // Show success and reset form
+    alert(`Workspace "${workspaceName}" created successfully!\n\nOrganization Type: ${organizationType}\nCoworkers: ${coworkers.length > 0 ? coworkers.join(', ') : 'None'}\n\n(Using dummy data - no backend call)`);
+    
+    // Reset form
+    setWorkspaceName('');
+    setOrganizationType('private');
+    setCoworkers([]);
+    setStep(1);
+    setLoading(false);
   };
 
   return (
@@ -150,7 +166,7 @@ export default function CreateWorkspace() {
                 </label>
                 <input
                   type="email"
-                  value="you@example.com"
+                  value="dummy-user@example.com"
                   className="input-field bg-gray-100"
                   disabled
                 />
@@ -166,6 +182,12 @@ export default function CreateWorkspace() {
                     type="email"
                     value={coworkerEmail}
                     onChange={(e) => setCoworkerEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCoworker();
+                      }
+                    }}
                     className="input-field"
                     placeholder="coworker@example.com"
                     disabled={loading}
@@ -173,7 +195,7 @@ export default function CreateWorkspace() {
                   <button
                     type="button"
                     onClick={handleAddCoworker}
-                    disabled={loading}
+                    disabled={loading || !coworkerEmail.trim()}
                     className="px-4 py-2 bg-dark-red text-white rounded-button font-semibold hover:bg-maroon disabled:opacity-50"
                   >
                     Add

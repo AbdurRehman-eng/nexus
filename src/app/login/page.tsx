@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn, signInWithGoogle } from '@/app/actions/auth';
-import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,59 +34,15 @@ export default function LoginPage() {
       return;
     }
 
-    try {
-      // Use API route instead of server action for better cookie handling
-      const response = await fetch('/api/auth/signin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || result.error) {
-        setError(result.error || 'Failed to sign in');
-        setLoading(false);
-        return;
-      }
-
-      console.log('[Login] Sign in successful via API route');
-      
-      // Wait a moment for cookies to be set
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Verify session exists
-      const supabase = createClient();
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      console.log('[Login] Session check after API signin:', {
-        hasSession: !!session,
-        sessionError: sessionError?.message,
-        userId: session?.user?.id
-      });
-      
-      if (session) {
-        console.log('[Login] Session confirmed, redirecting to homepage');
-        window.location.href = '/homepage';
-      } else {
-        // Retry once
-        await new Promise(resolve => setTimeout(resolve, 500));
-        const { data: { session: retrySession } } = await supabase.auth.getSession();
-        
-        if (retrySession) {
-          window.location.href = '/homepage';
-        } else {
-          console.log('[Login] No session found after retry');
-          setError('Session not found. Please refresh and try again.');
-          setLoading(false);
-        }
-      }
-    } catch (err) {
-      console.error('[Login] Error:', err);
-      setError('An error occurred. Please try again.');
+    const result = await signIn(email, password);
+    
+    if (result.error) {
+      setError(result.error);
       setLoading(false);
+    } else {
+      console.log('[Login] Sign in successful, redirecting...');
+      // Use full page reload to ensure cookies are available
+      window.location.href = '/homepage';
     }
   };
 
