@@ -34,15 +34,36 @@ export default function LoginPage() {
       return;
     }
 
-    const result = await signIn(email, password);
-    
-    if (result.error) {
-      setError(result.error);
-      setLoading(false);
-    } else {
-      console.log('[Login] Sign in successful, redirecting...');
-      // Use full page reload to ensure cookies are available
+    try {
+      // Use API route for better cookie handling
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+        credentials: 'include', // Important: include cookies
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.error) {
+        setError(result.error || 'Failed to sign in');
+        setLoading(false);
+        return;
+      }
+
+      console.log('[Login] Sign in successful via API route');
+      
+      // Wait a moment for cookies to be set
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Redirect with full page reload to ensure cookies are available
       window.location.href = '/homepage';
+    } catch (err) {
+      console.error('[Login] Error:', err);
+      setError('An error occurred. Please try again.');
+      setLoading(false);
     }
   };
 

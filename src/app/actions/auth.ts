@@ -76,18 +76,28 @@ export async function signIn(email: string, password: string) {
 
   console.log('[signIn] Session created:', {
     userId: data.session.user.id,
-    expiresAt: data.session.expires_at
+    expiresAt: data.session.expires_at,
+    expiresIn: data.session.expires_in
   });
 
-  // Ensure session is properly set by refreshing
+  // Force a session refresh to ensure cookies are set properly
+  // This is important for cookie persistence
   const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.getSession()
+  
+  if (refreshError) {
+    console.error('[signIn] Session refresh error:', refreshError);
+  }
+  
   console.log('[signIn] Session refresh:', {
     hasSession: !!refreshedSession,
-    refreshError: refreshError?.message
+    refreshError: refreshError?.message,
+    userId: refreshedSession?.user?.id
   });
   
+  // Revalidate paths to clear cache
   revalidatePath('/', 'layout')
   revalidatePath('/homepage')
+  
   return { data, error: null }
 }
 

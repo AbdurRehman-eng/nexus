@@ -14,9 +14,18 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
+            cookiesToSet.forEach(({ name, value, options }) => {
+              // Ensure cookies are set with proper options for persistence
+              cookieStore.set(name, value, {
+                ...options,
+                httpOnly: options?.httpOnly ?? true,
+                secure: options?.secure ?? (process.env.NODE_ENV === 'production'),
+                sameSite: options?.sameSite ?? 'lax',
+                path: options?.path ?? '/',
+                // Set maxAge if not provided to ensure cookies persist
+                maxAge: options?.maxAge ?? (options?.expires ? undefined : 60 * 60 * 24 * 7), // 7 days default
+              })
+            })
           } catch {
             // The `setAll` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing

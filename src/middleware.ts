@@ -19,16 +19,26 @@ export async function middleware(request: NextRequest) {
           supabaseResponse = NextResponse.next({
             request,
           })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
+          // Set cookies with proper options for persistence
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              httpOnly: options?.httpOnly ?? true,
+              secure: options?.secure ?? (process.env.NODE_ENV === 'production'),
+              sameSite: options?.sameSite ?? 'lax',
+              path: options?.path ?? '/',
+              // Ensure maxAge is set for persistent sessions
+              maxAge: options?.maxAge ?? (options?.expires ? undefined : 60 * 60 * 24 * 7), // 7 days default
+            })
+          })
         },
       },
     }
   )
 
   // Refresh session if expired - required for Server Components
-  await supabase.auth.getUser()
+  // This will update cookies if the session is refreshed
+  const { data: { user } } = await supabase.auth.getUser()
 
   return supabaseResponse
 }
