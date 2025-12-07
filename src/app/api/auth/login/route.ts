@@ -70,45 +70,50 @@ export async function POST(request: Request) {
 
     // Get all cookies that were set by Supabase SSR
     const allCookies = cookieStore.getAll()
-    console.log('[API login] Cookies in store after signIn:', {
-      count: allCookies.length,
-      names: allCookies.map(c => c.name)
+    const responseCookies = response.cookies.getAll()
+    
+    console.log('[API login] Cookies after signIn:', {
+      cookieStoreCount: allCookies.length,
+      cookieStoreNames: allCookies.map(c => c.name),
+      responseCookieCount: responseCookies.length,
+      responseCookieNames: responseCookies.map(c => c.name)
     })
 
-    // Create success response - cookies should already be in response from setAll
+    // Create success response
     const successResponse = NextResponse.json({ 
       success: true, 
       user: { id: data.user.id, email: data.user.email } 
     })
 
-    // Ensure all cookies from cookieStore are in the success response
+    // Copy ALL cookies from response (set by Supabase SSR in setAll)
+    // These are the actual auth cookies
+    responseCookies.forEach(cookie => {
+      successResponse.cookies.set(cookie.name, cookie.value, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+      })
+    })
+
+    // Also ensure any cookies from cookieStore that aren't in response are added
     allCookies.forEach(cookie => {
-      // Check if it's a Supabase auth cookie
-      if (cookie.name.includes('supabase') || cookie.name.includes('auth') || cookie.name.includes('sb-')) {
-        successResponse.cookies.set(cookie.name, cookie.value, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 60 * 60 * 24 * 7, // 7 days
-        })
-      }
-    })
-
-    // Also copy cookies from the response object (set by Supabase SSR)
-    response.cookies.getAll().forEach(cookie => {
       if (!successResponse.cookies.get(cookie.name)) {
-        successResponse.cookies.set(cookie.name, cookie.value, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 60 * 60 * 24 * 7,
-        })
+        // Only add Supabase-related cookies
+        if (cookie.name.includes('supabase') || cookie.name.includes('auth') || cookie.name.includes('sb-')) {
+          successResponse.cookies.set(cookie.name, cookie.value, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 60 * 60 * 24 * 7,
+          })
+        }
       }
     })
 
-    console.log('[API login] Session created, cookies set in response:', {
+    console.log('[API login] Final response cookies:', {
       cookieCount: successResponse.cookies.getAll().length,
       cookieNames: successResponse.cookies.getAll().map(c => c.name),
       userId: data.user.id
