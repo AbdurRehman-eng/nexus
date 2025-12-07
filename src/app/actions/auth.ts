@@ -37,7 +37,13 @@ export async function signUp(email: string, password: string, username?: string)
     }
   }
 
+  // If session exists, ensure it's properly set
+  if (data.session) {
+    await supabase.auth.getSession()
+  }
+
   revalidatePath('/', 'layout')
+  revalidatePath('/homepage')
   return { data, error: null, requiresConfirmation: false }
 }
 
@@ -67,7 +73,11 @@ export async function signIn(email: string, password: string) {
     return { error: 'Failed to create session. Please try again.', data: null }
   }
 
+  // Ensure session is properly set by refreshing
+  await supabase.auth.getSession()
+  
   revalidatePath('/', 'layout')
+  revalidatePath('/homepage')
   return { data, error: null }
 }
 

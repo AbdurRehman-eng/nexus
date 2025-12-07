@@ -33,11 +33,10 @@ export default function RegisterPage() {
       // Show success message if email confirmation is required
       setError('');
       alert(result.message || 'Please check your email to confirm your account before signing in.');
-      router.push('/login');
+      window.location.href = '/login';
     } else {
-      // User is automatically signed in
-      router.push('/homepage');
-      router.refresh();
+      // User is automatically signed in - use full page reload to ensure cookies are set
+      window.location.href = '/homepage';
     }
   };
 

@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getWorkspaces } from '@/app/actions/workspaces';
-import { signOut } from '@/app/actions/auth';
+import { signOut, getSession } from '@/app/actions/auth';
+import { createClient } from '@/lib/supabase/client';
 
 interface Workspace {
   id: string;
@@ -21,18 +22,61 @@ export default function Homepage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    loadWorkspaces();
+    // First check if user is authenticated before loading workspaces
+    checkAuthAndLoad();
   }, []);
 
-  const loadWorkspaces = async () => {
+  const checkAuthAndLoad = async () => {
     setLoading(true);
     setError('');
+    
+    // Try to load workspaces directly - server action will handle auth check
+    // If it fails, then check client-side session
+    const result = await getWorkspaces();
+    
+    if (result.error && result.error === 'Not authenticated') {
+      // Server says not authenticated, verify on client side with retry
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        // No session found, redirect to login
+        window.location.href = '/login';
+        return;
+      }
+      
+      // Session exists on client but server doesn't see it - retry once
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const retryResult = await getWorkspaces();
+      
+      if (retryResult.error && retryResult.error === 'Not authenticated') {
+        window.location.href = '/login';
+        return;
+      }
+      
+      // Retry succeeded
+      setWorkspaces(retryResult.data || []);
+      setLoading(false);
+    } else if (result.error) {
+      setError(result.error);
+      setLoading(false);
+    } else {
+      setWorkspaces(result.data || []);
+      setLoading(false);
+    }
+  };
+
+  const loadWorkspaces = async () => {
     const result = await getWorkspaces();
     
     if (result.error) {
       setError(result.error);
       if (result.error === 'Not authenticated') {
-        router.push('/login');
+        // Use window.location for full redirect to clear any cached state
+        window.location.href = '/login';
+        return;
       }
     } else {
       setWorkspaces(result.data || []);

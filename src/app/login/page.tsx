@@ -40,11 +40,9 @@ export default function LoginPage() {
       setError(result.error);
       setLoading(false);
     } else {
-      // Small delay to ensure session is set
-      setTimeout(() => {
-        router.push('/homepage');
-        router.refresh();
-      }, 100);
+      // Use window.location for full page reload to ensure cookies are set
+      // This ensures the session is available when homepage loads
+      window.location.href = '/homepage';
     }
   };
 
