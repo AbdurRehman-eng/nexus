@@ -1,57 +1,74 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { searchWorkspace } from '@/app/actions/search';
+import { createClient } from '@/lib/supabase/client';
 
 interface SearchResult {
-  type: 'message' | 'file' | 'channel';
+  type: 'message' | 'channel' | 'workspace';
+  id: string;
   title: string;
   content: string;
   author?: string;
   timestamp?: string;
   channel?: string;
+  channelId?: string;
+  workspaceId?: string;
 }
 
 export default function AISearchPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [accessToken, setAccessToken] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+      
+      setAccessToken(session.access_token);
+    };
+    
+    checkAuth();
+  }, [router]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() || !accessToken) return;
 
     setIsSearching(true);
+    setError('');
     
-    // Simulate AI search
-    setTimeout(() => {
-      const mockResults: SearchResult[] = [
-        {
-          type: 'message',
-          title: 'Project Update Discussion',
-          content: 'The latest updates on the project were shared, including timeline adjustments and new feature requirements.',
-          author: 'John Doe',
-          timestamp: '2 hours ago',
-          channel: '#announcements',
-        },
-        {
-          type: 'file',
-          title: 'Q4_Report.pdf',
-          content: 'Quarterly financial report containing revenue analysis and growth projections.',
-          author: 'Jane Smith',
-          timestamp: 'Yesterday',
-          channel: '#team-finance',
-        },
-        {
-          type: 'channel',
-          title: '#design-team',
-          content: 'Channel dedicated to design discussions, mockups, and UI/UX feedback.',
-          channel: '#design-team',
-        },
-      ];
-      setResults(mockResults);
-      setIsSearching(false);
-    }, 1500);
+    const result = await searchWorkspace(accessToken, searchQuery);
+    
+    if (result.error) {
+      setError(result.error);
+      setResults([]);
+    } else {
+      setResults(result.data || []);
+    }
+    
+    setIsSearching(false);
+  };
+
+  const handleResultClick = (result: SearchResult) => {
+    if (result.type === 'message' && result.workspaceId) {
+      router.push(`/chat/${result.workspaceId}`);
+    } else if (result.type === 'channel' && result.workspaceId) {
+      router.push(`/chat/${result.workspaceId}`);
+    } else if (result.type === 'workspace' && result.workspaceId) {
+      router.push(`/chat/${result.workspaceId}`);
+    }
   };
 
   return (
@@ -118,17 +135,34 @@ export default function AISearchPage() {
 
             {/* Suggestions */}
             <div className="mt-12 w-full max-w-2xl">
-              <p className="text-sm text-gray-500 mb-4">Try asking:</p>
+              <p className="text-sm text-gray-500 mb-4">Try searching for:</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {[
-                  'What were the latest project updates?',
-                  'Find all files shared by John',
-                  'Show me design discussions',
-                  'What meetings are scheduled?',
+                  'project update',
+                  'meeting',
+                  'design',
+                  'general',
                 ].map((suggestion, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setSearchQuery(suggestion)}
+                    onClick={() => {
+                      setSearchQuery(suggestion);
+                      // Auto-submit
+                      setTimeout(() => {
+                        if (accessToken) {
+                          setIsSearching(true);
+                          searchWorkspace(accessToken, suggestion).then(result => {
+                            if (result.error) {
+                              setError(result.error);
+                              setResults([]);
+                            } else {
+                              setResults(result.data || []);
+                            }
+                            setIsSearching(false);
+                          });
+                        }
+                      }, 100);
+                    }}
                     className="text-left p-3 border border-gray-border rounded-input hover:border-dark-red hover:bg-light-gray transition-colors"
                   >
                     <span className="text-sm text-gray-700">{suggestion}</span>
@@ -169,28 +203,41 @@ export default function AISearchPage() {
               </div>
             </form>
 
+            {/* Error Message */}
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-input mb-6">
+                {error}
+              </div>
+            )}
+
             {/* Results */}
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-dark-red">
                 Found {results.length} {results.length === 1 ? 'result' : 'results'}
               </h2>
 
-              {results.map((result, idx) => (
-                <div key={idx} className="card hover:shadow-lg transition-shadow">
+              {results.length === 0 && !error && (
+                <div className="text-center py-12 text-gray-500">
+                  <p>No results found for "{searchQuery}"</p>
+                  <p className="text-sm mt-2">Try different keywords or check your spelling</p>
+                </div>
+              )}
+
+              {results.map((result) => (
+                <button
+                  key={result.id}
+                  onClick={() => handleResultClick(result)}
+                  className="w-full card hover:shadow-lg transition-shadow text-left"
+                >
                   <div className="flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
                       result.type === 'message' ? 'bg-blue-100 text-blue-600' :
-                      result.type === 'file' ? 'bg-green-100 text-green-600' :
-                      'bg-purple-100 text-purple-600'
+                      result.type === 'channel' ? 'bg-purple-100 text-purple-600' :
+                      'bg-green-100 text-green-600'
                     }`}>
                       {result.type === 'message' && (
                         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                      )}
-                      {result.type === 'file' && (
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
                       )}
                       {result.type === 'channel' && (
@@ -198,11 +245,16 @@ export default function AISearchPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                         </svg>
                       )}
+                      {result.type === 'workspace' && (
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                      )}
                     </div>
 
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">{result.title}</h3>
-                      <p className="text-gray-700 mb-3">{result.content}</p>
+                      <p className="text-gray-700 mb-3 line-clamp-2">{result.content}</p>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         {result.author && <span>By {result.author}</span>}
                         {result.timestamp && <span>{result.timestamp}</span>}
@@ -211,8 +263,12 @@ export default function AISearchPage() {
                         )}
                       </div>
                     </div>
+
+                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>

@@ -42,6 +42,8 @@ export default function Homepage() {
     // Pass access token to server action for validation
     const result = await getWorkspaces(session.access_token);
     
+    console.log('[Homepage] getWorkspaces result:', result);
+    
     if (result.error) {
       if (result.error === 'Not authenticated') {
         console.error('[Homepage] Authentication failed, redirecting to login');
@@ -50,6 +52,7 @@ export default function Homepage() {
       }
       setError(result.error);
     } else {
+      console.log('[Homepage] Setting workspaces:', result.data);
       setWorkspaces(result.data || []);
     }
     

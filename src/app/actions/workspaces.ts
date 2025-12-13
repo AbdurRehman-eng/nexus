@@ -4,10 +4,27 @@ import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
 // Helper to create admin client for server-side operations
+// Uses SERVICE_ROLE key to bypass RLS policies
 function getSupabaseAdmin() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!serviceRoleKey) {
+    console.error('[getSupabaseAdmin] SERVICE_ROLE_KEY not found, falling back to ANON_KEY')
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
+  }
+  
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    serviceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
   )
 }
 
@@ -59,13 +76,27 @@ export async function createWorkspace(accessToken: string, name: string, organiz
   }
 
   // Add owner as workspace member
-  await supabase
+  const { data: memberData, error: memberError } = await supabase
     .from('workspace_members')
     .insert({
       workspace_id: workspace.id,
       user_id: ownerId,
       role: 'owner',
     })
+    .select()
+  
+  console.log('[createWorkspace] Added owner as member:', { 
+    workspaceId: workspace.id, 
+    userId: ownerId, 
+    memberData,
+    memberError: memberError?.message 
+  })
+  
+  // Check if member insert failed
+  if (memberError) {
+    console.error('[createWorkspace] Failed to add owner as member:', memberError)
+    return { error: `Workspace created but failed to add you as member: ${memberError.message}`, data: null }
+  }
 
   // Create default channel
   const { data: channel } = await supabase
@@ -107,6 +138,8 @@ export async function getWorkspaces(accessToken: string) {
 
   // Get user ID from user object
   const userId = user.id
+  
+  console.log('[getWorkspaces] Fetching workspaces for user:', userId)
 
   const { data: workspaces, error } = await supabase
     .from('workspaces')
@@ -117,7 +150,14 @@ export async function getWorkspaces(accessToken: string) {
     `)
     .eq('workspace_members.user_id', userId)
 
+  console.log('[getWorkspaces] Query result:', { 
+    workspaceCount: workspaces?.length || 0, 
+    error: error?.message,
+    workspaces: workspaces 
+  })
+
   if (error) {
+    console.error('[getWorkspaces] Query error:', error)
     return { error: error.message, data: null }
   }
 
@@ -129,6 +169,8 @@ export async function getWorkspaces(accessToken: string) {
     designation: workspace.workspace_members?.[0]?.role === 'owner' ? 'Owner' : 'Member',
     channelsCount: Array.isArray(workspace.channels) ? workspace.channels.length : 0,
   })) || []
+  
+  console.log('[getWorkspaces] Formatted workspaces:', formattedWorkspaces)
 
   return { data: formattedWorkspaces, error: null }
 }

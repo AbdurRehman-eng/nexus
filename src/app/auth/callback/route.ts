@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 /**
  * OAuth callback handler
  * Handles the redirect from OAuth providers (e.g., Google)
+ * Note: OAuth in simple auth approach stores session in localStorage via client redirect
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -18,7 +19,10 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const supabase = await createClient()
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    )
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
     
     if (exchangeError) {
