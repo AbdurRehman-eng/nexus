@@ -1,10 +1,7 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export function createClient() {
-  // createBrowserClient automatically handles cookies
-  // It will read from document.cookie and can set non-httpOnly cookies
-  // httpOnly cookies are set by the server (API routes, middleware)
-  return createBrowserClient(
+  return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )

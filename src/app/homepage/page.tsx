@@ -22,103 +22,48 @@ export default function Homepage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Wait for page to fully load, middleware to run, and cookies to be available
-    const timer = setTimeout(() => {
-      checkAuthAndLoad();
-    }, 1500);
-    
-    return () => clearTimeout(timer);
+    loadWorkspaces();
   }, []);
 
-  const checkAuthAndLoad = async () => {
+  const loadWorkspaces = async () => {
     setLoading(true);
     setError('');
     
-    console.log('[Homepage] Starting auth check...');
-    
-    // First check client-side session
+    // Check client-side session first
     const supabase = createClient();
-    const { data: { session: clientSession }, error: clientError } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     
-    console.log('[Homepage] Client session check:', {
-      hasSession: !!clientSession,
-      clientError: clientError?.message,
-      userId: clientSession?.user?.id,
-      expiresAt: clientSession?.expires_at
-    });
-    
-    if (!clientSession) {
-      console.log('[Homepage] No client session - redirecting to login');
-      window.location.href = '/login';
+    if (!session) {
+      console.log('[Homepage] No session, redirecting to login');
+      router.push('/login');
       return;
     }
     
-    // Wait for cookies to propagate to server and middleware to refresh session
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    // Now try server action
-    console.log('[Homepage] Calling getWorkspaces (server-side auth check)...');
-    let result = await getWorkspaces();
-    
-    console.log('[Homepage] getWorkspaces result:', {
-      hasError: !!result.error,
-      error: result.error,
-      hasData: !!result.data,
-      dataLength: result.data?.length
-    });
-    
-    // If server says not authenticated but client has session, retry
-    if (result.error && result.error === 'Not authenticated') {
-      console.log('[Homepage] Server says not authenticated, but client has session - retrying...');
-      
-      // Retry a few times with delays
-      for (let i = 0; i < 3; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        result = await getWorkspaces();
-        console.log(`[Homepage] Retry ${i + 1} result:`, {
-          hasError: !!result.error,
-          error: result.error
-        });
-        
-        if (!result.error || result.error !== 'Not authenticated') {
-          break;
-        }
-      }
-    }
-    
-    if (result.error && result.error === 'Not authenticated') {
-      console.log('[Homepage] Still not authenticated after retries - redirecting to login');
-      window.location.href = '/login';
-      return;
-    } else if (result.error) {
-      console.log('[Homepage] Other error:', result.error);
-      setError(result.error);
-      setLoading(false);
-    } else {
-      console.log('[Homepage] Success - setting workspaces');
-      setWorkspaces(result.data || []);
-      setLoading(false);
-    }
-  };
-
-  const loadWorkspaces = async () => {
-    const result = await getWorkspaces();
+    // Pass access token to server action for validation
+    const result = await getWorkspaces(session.access_token);
     
     if (result.error) {
-      setError(result.error);
       if (result.error === 'Not authenticated') {
-        // Use window.location for full redirect to clear any cached state
-        window.location.href = '/login';
+        console.error('[Homepage] Authentication failed, redirecting to login');
+        router.push('/login');
         return;
       }
+      setError(result.error);
     } else {
       setWorkspaces(result.data || []);
     }
+    
     setLoading(false);
   };
 
+
   const handleLogout = async () => {
-    await signOut();
+    // Sign out client-side first
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    
+    // Then redirect to login
+    router.push('/login');
   };
 
   return (

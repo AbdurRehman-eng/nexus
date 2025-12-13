@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { signUp, signInWithGoogle } from '@/app/actions/auth';
+import { signInWithGoogle } from '@/app/actions/auth';
+import { createClient } from '@/lib/supabase/client';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -24,19 +25,57 @@ export default function RegisterPage() {
       return;
     }
 
-    const result = await signUp(email, password);
-    
-    if (result.error) {
-      setError(result.error);
+    try {
+      // Use client-side Supabase auth directly for reliable cookie management
+      const supabase = createClient();
+      
+      console.log('[Register] Calling signUp...');
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            username: email.split('@')[0],
+          },
+        },
+      });
+
+      if (signUpError) {
+        console.error('[Register] Registration failed:', signUpError.message);
+        setError(signUpError.message);
+        setLoading(false);
+        return;
+      }
+
+      // Check if email confirmation is required
+      if (data.user && !data.session) {
+        console.log('[Register] Email confirmation required');
+        setError('');
+        alert('Please check your email to confirm your account before signing in.');
+        router.push('/login');
+        return;
+      }
+
+      // If session exists, user is automatically signed in
+      if (data.session) {
+        console.log('[Register] Registration successful, user auto-signed in:', {
+          userId: data.user?.id,
+          email: data.user?.email,
+        });
+        
+        // Redirect to homepage
+        router.push('/homepage');
+      } else {
+        // Unexpected case
+        console.warn('[Register] No session and no confirmation required');
+        setError('Registration succeeded but session not created. Please try logging in.');
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('[Register] Error:', err);
+      setError('An error occurred. Please try again.');
       setLoading(false);
-    } else if (result.requiresConfirmation) {
-      // Show success message if email confirmation is required
-      setError('');
-      alert(result.message || 'Please check your email to confirm your account before signing in.');
-      window.location.href = '/login';
-    } else {
-      // User is automatically signed in - use full page reload to ensure cookies are set
-      window.location.href = '/homepage';
     }
   };
 

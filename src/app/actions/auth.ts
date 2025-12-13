@@ -1,11 +1,24 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
+// Helper to create admin client for server-side operations
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
+
+/**
+ * Register a new user account
+ * Note: Registration is now done client-side.
+ * This server action is kept for compatibility but not used.
+ */
 export async function signUp(email: string, password: string, username?: string) {
-  const supabase = await createClient()
+  const supabase = getSupabaseAdmin()
 
   // Validate password length
   if (password.length < 6) {
@@ -37,18 +50,19 @@ export async function signUp(email: string, password: string, username?: string)
     }
   }
 
-  // If session exists, ensure it's properly set
-  if (data.session) {
-    await supabase.auth.getSession()
-  }
-
+  // If session exists, return it - the client will handle cookie management
   revalidatePath('/', 'layout')
   revalidatePath('/homepage')
   return { data, error: null, requiresConfirmation: false }
 }
 
+/**
+ * Sign in with email and password
+ * Note: Login is now done client-side.
+ * This server action is kept for compatibility but not used.
+ */
 export async function signIn(email: string, password: string) {
-  const supabase = await createClient()
+  const supabase = getSupabaseAdmin()
 
   if (!email || !password) {
     return { error: 'Email and password are required', data: null }
@@ -64,35 +78,16 @@ export async function signIn(email: string, password: string) {
     if (error.message.includes('Invalid login credentials')) {
       return { error: 'Invalid email or password', data: null }
     }
-    // Allow sign-in without email verification - removed email confirmation check
     return { error: error.message, data: null }
   }
 
   // Verify session was created
   if (!data.session) {
-    console.log('[signIn] No session in response');
     return { error: 'Failed to create session. Please try again.', data: null }
   }
 
-  console.log('[signIn] Session created:', {
-    userId: data.session.user.id,
-    expiresAt: data.session.expires_at,
-    expiresIn: data.session.expires_in
-  });
-
-  // Force a session refresh to ensure cookies are set properly
-  // This is important for cookie persistence
-  const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.getSession()
-  
-  if (refreshError) {
-    console.error('[signIn] Session refresh error:', refreshError);
-  }
-  
-  console.log('[signIn] Session refresh:', {
-    hasSession: !!refreshedSession,
-    refreshError: refreshError?.message,
-    userId: refreshedSession?.user?.id
-  });
+  // Don't call setSession here - it fails silently in Server Actions
+  // The client-side code will handle setting the session in the browser
   
   // Revalidate paths to clear cache
   revalidatePath('/', 'layout')
@@ -101,15 +96,27 @@ export async function signIn(email: string, password: string) {
   return { data, error: null }
 }
 
-export async function signOut() {
-  const supabase = await createClient()
-  await supabase.auth.signOut()
+/**
+ * Sign out the current user
+ * Clears the session client-side
+ */
+export async function signOut(accessToken: string) {
+  const supabase = getSupabaseAdmin()
+  
+  // Sign out on server (optional)
+  if (accessToken) {
+    await supabase.auth.admin.signOut(accessToken)
+  }
+  
   revalidatePath('/', 'layout')
   redirect('/login')
 }
 
+/**
+ * Sign in with Google OAuth
+ */
 export async function signInWithGoogle() {
-  const supabase = await createClient()
+  const supabase = getSupabaseAdmin()
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -133,14 +140,11 @@ export async function signInWithGoogle() {
   return { data, error: null }
 }
 
-export async function getSession() {
-  const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  return session
-}
-
-export async function getUser() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+/**
+ * Get the current authenticated user
+ */
+export async function getUser(accessToken: string) {
+  const supabase = getSupabaseAdmin()
+  const { data: { user } } = await supabase.auth.getUser(accessToken)
   return user
 }

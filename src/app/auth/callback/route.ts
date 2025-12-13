@@ -1,6 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
+/**
+ * OAuth callback handler
+ * Handles the redirect from OAuth providers (e.g., Google)
+ */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
@@ -10,7 +14,6 @@ export async function GET(request: Request) {
 
   // Handle OAuth errors
   if (error) {
-    console.error('OAuth error:', error, errorDescription)
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(errorDescription || error)}`)
   }
 
@@ -19,11 +22,10 @@ export async function GET(request: Request) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
     
     if (exchangeError) {
-      console.error('Session exchange error:', exchangeError)
       return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent('Failed to complete sign in. Please try again.')}`)
     }
   }
 
-  // URL to redirect to after sign in process completes
+  // Redirect to homepage after successful authentication
   return NextResponse.redirect(`${origin}/homepage`)
 }

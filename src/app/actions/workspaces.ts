@@ -1,41 +1,26 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
-export async function createWorkspace(name: string, organizationType: 'private' | 'public', coworkerEmails: string[] = []) {
-  const supabase = await createClient()
+// Helper to create admin client for server-side operations
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
-  // For now, use hardcoded email until login works
-  // TODO: Switch back to authenticated user once login is working
-  const TEMP_OWNER_EMAIL = 'shafiqueabdurrehman@gmail.com'
+export async function createWorkspace(accessToken: string, name: string, organizationType: 'private' | 'public', coworkerEmails: string[] = []) {
+  const supabase = getSupabaseAdmin()
   
-  // Try to get authenticated user first
-  const { data: { user: authUser }, error: userError } = await supabase.auth.getUser()
-  
-  let ownerId: string | null = null
-  
-  if (authUser) {
-    // If user is authenticated, use their ID
-    ownerId = authUser.id
-  } else {
-    // If not authenticated, look up user by email from profiles table
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', TEMP_OWNER_EMAIL)
-      .single()
-    
-    if (profileError || !profile) {
-      return { error: `User with email ${TEMP_OWNER_EMAIL} not found. Please ensure the user exists in the database.`, data: null }
-    }
-    
-    ownerId = profile.id
+  // Validate token and get user
+  const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: null }
   }
-  
-  if (!ownerId) {
-    return { error: 'Unable to determine workspace owner', data: null }
-  }
+
+  const ownerId = user.id
 
   // Create workspace
   const { data: workspace, error: workspaceError } = await supabase
@@ -109,68 +94,28 @@ export async function createWorkspace(name: string, organizationType: 'private' 
   return { data: workspace, error: null }
 }
 
-export async function getWorkspaces() {
-  const supabase = await createClient()
+export async function getWorkspaces(accessToken: string) {
+  const supabase = getSupabaseAdmin()
 
-  // Debug: Check cookies first
-  const { cookies } = await import('next/headers')
-  const cookieStore = await cookies()
-  const allCookies = cookieStore.getAll()
-  console.log('[getWorkspaces] Available cookies:', {
-    count: allCookies.length,
-    allNames: allCookies.map(c => c.name),
-    supabaseCookies: allCookies.filter(c => 
-      c.name.includes('supabase') || 
-      c.name.includes('auth') || 
-      c.name.includes('sb-') ||
-      c.name.includes('access_token') ||
-      c.name.includes('refresh_token')
-    ).map(c => ({ name: c.name, hasValue: !!c.value, valueLength: c.value?.length }))
-  })
-
-  // Debug: Check session first
-  const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession()
-  console.log('[getWorkspaces] Session check:', { 
-    hasSession: !!sessionData, 
-    sessionError: sessionError?.message,
-    userId: sessionData?.user?.id,
-    expiresAt: sessionData?.expires_at
-  })
-
-  // If no session, try refreshing
-  if (!sessionData) {
-    console.log('[getWorkspaces] No session, attempting refresh...')
-    const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
-    console.log('[getWorkspaces] After refresh:', {
-      hasSession: !!refreshedSession,
-      userId: refreshedSession?.user?.id
-    })
-  }
-
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  console.log('[getWorkspaces] User check:', { 
-    hasUser: !!user, 
-    userError: userError?.message,
-    userId: user?.id,
-    email: user?.email
-  })
+  // Validate token and get user
+  const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
   
-  if (userError || !user) {
-    console.log('[getWorkspaces] Auth failed - returning error', {
-      userError: userError?.message,
-      hasUser: !!user
-    })
+  if (authError || !user) {
+    console.error('[getWorkspaces] Not authenticated:', authError?.message)
     return { error: 'Not authenticated', data: null }
   }
+
+  // Get user ID from user object
+  const userId = user.id
 
   const { data: workspaces, error } = await supabase
     .from('workspaces')
     .select(`
       *,
-      workspace_members!inner(user_id),
+      workspace_members!inner(user_id, role),
       channels(count)
     `)
-    .eq('workspace_members.user_id', user.id)
+    .eq('workspace_members.user_id', userId)
 
   if (error) {
     return { error: error.message, data: null }
@@ -180,7 +125,7 @@ export async function getWorkspaces() {
   const formattedWorkspaces = workspaces?.map(workspace => ({
     id: workspace.id,
     name: workspace.name,
-    owner: workspace.owner_id === user.id ? 'You' : 'Other',
+    owner: workspace.owner_id === userId ? 'You' : 'Other',
     designation: workspace.workspace_members?.[0]?.role === 'owner' ? 'Owner' : 'Member',
     channelsCount: Array.isArray(workspace.channels) ? workspace.channels.length : 0,
   })) || []
@@ -188,11 +133,12 @@ export async function getWorkspaces() {
   return { data: formattedWorkspaces, error: null }
 }
 
-export async function getWorkspace(workspaceId: string) {
-  const supabase = await createClient()
+export async function getWorkspace(accessToken: string, workspaceId: string) {
+  const supabase = getSupabaseAdmin()
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser()
-  if (userError || !user) {
+  // Validate token and get user
+  const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+  if (authError || !user) {
     return { error: 'Not authenticated', data: null }
   }
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithGoogle } from '@/app/actions/auth';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,7 +20,6 @@ export default function LoginPage() {
     const urlError = searchParams.get('error');
     if (urlError) {
       setError(decodeURIComponent(urlError));
-      // Clean up URL
       router.replace('/login');
     }
   }, [searchParams, router]);
@@ -29,6 +29,9 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
 
+    console.log('[Login] ===== LOGIN ATTEMPT START =====');
+    console.log('[Login] Email:', email);
+
     if (!email || !password) {
       setError('Please enter both email and password');
       setLoading(false);
@@ -36,53 +39,53 @@ export default function LoginPage() {
     }
 
     try {
-      // Use API route to set cookies properly on server
-      console.log('[Login] Calling API route for login...');
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include', // Important: include cookies
+      // Use client-side Supabase auth directly for reliable cookie management
+      const supabase = createClient();
+      
+      console.log('[Login] Calling signInWithPassword...');
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
       });
 
-      const result = await response.json();
-
-      if (!response.ok || result.error) {
-        console.error('[Login] API login error:', result.error);
-        setError(result.error || 'Failed to sign in');
+      if (signInError) {
+        console.error('[Login] Login failed:', signInError.message);
+        // Provide user-friendly error messages
+        if (signInError.message.includes('Invalid login credentials')) {
+          setError('Invalid email or password');
+        } else {
+          setError(signInError.message);
+        }
         setLoading(false);
         return;
       }
 
-      console.log('[Login] API login successful:', {
-        userId: result.user?.id,
-        cookieHeaders: response.headers.get('set-cookie')?.substring(0, 100)
-      });
-
-      // Wait for cookies to be set and middleware to process
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Verify session exists in browser
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      console.log('[Login] Browser session check after API login:', {
-        hasSession: !!session,
-        userId: session?.user?.id
-      });
-      
-      if (!session) {
-        console.warn('[Login] No browser session, but API said success - cookies may need time to propagate');
-        // Still redirect - middleware will handle it
+      if (!data.session) {
+        console.error('[Login] No session in response');
+        setError('Failed to create session. Please try again.');
+        setLoading(false);
+        return;
       }
+
+      console.log('[Login] ✅ Login successful:', data.user?.email);
+
+      // Verify session was set in browser
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (!session) {
+        console.error('[Login] Session not found after login');
+        setError('Session not found. Please try again.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('[Login] ✅ Redirecting to homepage...');
       
-      // Redirect with full page reload
-      window.location.href = '/homepage';
+      // Use router.push for client-side navigation with cache revalidation
+      router.push('/homepage');
+      
     } catch (err) {
-      console.error('[Login] Error:', err);
+      console.error('[Login] ===== ERROR =====', err);
       setError('An error occurred. Please try again.');
       setLoading(false);
     }

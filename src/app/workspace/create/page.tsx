@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createWorkspace } from '@/app/actions/workspaces';
+import { createClient } from '@/lib/supabase/client';
 
 export default function CreateWorkspace() {
   const router = useRouter();
@@ -13,6 +14,26 @@ export default function CreateWorkspace() {
   const [coworkers, setCoworkers] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
+  const [accessToken, setAccessToken] = useState('');
+
+  // Check authentication and get user info
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+      
+      setAccessToken(session.access_token);
+      setUserEmail(session.user.email || '');
+    };
+    
+    checkAuth();
+  }, [router]);
 
   const handleStep1Next = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,21 +62,15 @@ export default function CreateWorkspace() {
     setError('');
     setLoading(true);
 
-    const result = await createWorkspace(workspaceName, organizationType, coworkers);
+    // Pass access token to authenticate the request
+    const result = await createWorkspace(accessToken, workspaceName, organizationType, coworkers);
     
     if (result.error) {
       setError(result.error);
       setLoading(false);
     } else {
-      // Show success message
-      alert(`Workspace "${workspaceName}" created successfully!\n\nOrganization Type: ${organizationType}\nCoworkers: ${coworkers.length > 0 ? coworkers.join(', ') : 'None'}\n\nWorkspace has been added to Supabase.`);
-      
-      // Reset form
-      setWorkspaceName('');
-      setOrganizationType('private');
-      setCoworkers([]);
-      setStep(1);
-      setLoading(false);
+      // Redirect to homepage after successful creation
+      router.push('/homepage');
     }
   };
 
@@ -161,7 +176,7 @@ export default function CreateWorkspace() {
                 </label>
                 <input
                   type="email"
-                  value="shafiqueabdurrehman@gmail.com"
+                  value={userEmail || 'Loading...'}
                   className="input-field bg-gray-100"
                   disabled
                 />
