@@ -48,6 +48,8 @@ function EmojiReactions() {
   const { send } = useDataChannel('emoji-reactions', handleEmojiMessage);
 
   const sendEmoji = useCallback((emoji: string) => {
+    if (!send) return;
+    
     const payload = JSON.stringify({
       type: 'emoji',
       emoji,
@@ -56,7 +58,8 @@ function EmojiReactions() {
     });
 
     const encoder = new TextEncoder();
-    send(encoder.encode(payload));
+    const data = encoder.encode(payload);
+    send(data, { reliable: true } as any);
     setShowEmojiPicker(false);
   }, [send, room]);
 
