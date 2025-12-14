@@ -192,15 +192,36 @@ export class WebRTCService {
 
   // Create and send offer to participant
   async createOffer(participantId: string, onSignal: (signal: SignalData) => void): Promise<void> {
-    const pc = this.createPeerConnection(participantId, onSignal);
+    // Check if we already have a connection
+    let pc = this.peerConnections.get(participantId);
+    
+    if (pc) {
+      console.log('[WebRTC] Peer connection already exists for:', participantId, 'state:', pc.signalingState);
+      
+      // If we're already in negotiation, don't create another offer
+      if (pc.signalingState !== 'stable') {
+        console.warn('[WebRTC] Cannot create offer - already in negotiation. State:', pc.signalingState);
+        return;
+      }
+      
+      // If already connected, this is a renegotiation
+      if (pc.connectionState === 'connected') {
+        console.log('[WebRTC] Creating renegotiation offer');
+      }
+    } else {
+      pc = this.createPeerConnection(participantId, onSignal);
+      console.log('[WebRTC] Created new peer connection for:', participantId);
+    }
 
     try {
+      console.log('[WebRTC] Creating offer, current state:', pc.signalingState);
       const offer = await pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
       });
 
       await pc.setLocalDescription(offer);
+      console.log('[WebRTC] Offer created, signaling state:', pc.signalingState);
 
       onSignal({
         type: 'offer',
@@ -220,12 +241,34 @@ export class WebRTCService {
     offer: RTCSessionDescriptionInit,
     onSignal: (signal: SignalData) => void
   ): Promise<void> {
-    const pc = this.createPeerConnection(participantId, onSignal);
+    // Check if we already have a connection
+    let pc = this.peerConnections.get(participantId);
+    
+    if (pc) {
+      console.log('[WebRTC] Peer connection already exists for:', participantId, 'state:', pc.signalingState);
+      
+      // If we're already connected or connecting, ignore duplicate offer
+      if (pc.signalingState !== 'stable' && pc.signalingState !== 'closed') {
+        console.warn('[WebRTC] Ignoring duplicate offer - already in negotiation. State:', pc.signalingState);
+        return;
+      }
+      
+      // If stable but already connected, this might be a renegotiation
+      if (pc.signalingState === 'stable' && pc.connectionState === 'connected') {
+        console.log('[WebRTC] Handling renegotiation offer');
+      }
+    } else {
+      pc = this.createPeerConnection(participantId, onSignal);
+      console.log('[WebRTC] Created new peer connection for:', participantId);
+    }
 
     try {
+      console.log('[WebRTC] Setting remote offer, current state:', pc.signalingState);
       await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      console.log('[WebRTC] Creating answer...');
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+      console.log('[WebRTC] Answer created, signaling state:', pc.signalingState);
 
       onSignal({
         type: 'answer',
@@ -242,13 +285,26 @@ export class WebRTCService {
   // Handle received answer
   async handleAnswer(participantId: string, answer: RTCSessionDescriptionInit): Promise<void> {
     const pc = this.peerConnections.get(participantId);
-    if (pc) {
-      try {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
-      } catch (error) {
-        console.error('[WebRTC] Error handling answer:', error);
-        throw error;
-      }
+    if (!pc) {
+      console.error('[WebRTC] No peer connection found for:', participantId);
+      return;
+    }
+
+    console.log('[WebRTC] Current signaling state:', pc.signalingState);
+    
+    // Only process answer if we're in the correct state (waiting for answer)
+    if (pc.signalingState !== 'have-local-offer') {
+      console.warn('[WebRTC] Cannot process answer - wrong state:', pc.signalingState, 'Expected: have-local-offer');
+      console.warn('[WebRTC] This usually means we received an answer without sending an offer first');
+      return;
+    }
+
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      console.log('[WebRTC] ✅ Remote answer set successfully, state:', pc.signalingState);
+    } catch (error) {
+      console.error('[WebRTC] Error handling answer:', error);
+      throw error;
     }
   }
 

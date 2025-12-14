@@ -83,7 +83,7 @@ export default function FileUpload({ messageId, accessToken, onUploadComplete }:
       
       {uploading ? (
         <div className="flex items-center gap-2 px-2">
-          <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div className="w-16 bg-gray-200 rounded-full h-2">
             <div 
               className="bg-dark-red h-2 rounded-full transition-all duration-300"
               style={{ width: `${uploadProgress}%` }}
@@ -95,7 +95,7 @@ export default function FileUpload({ messageId, accessToken, onUploadComplete }:
         <button
           type="button"
           onClick={handleClick}
-          className="p-1 hover:bg-light-gray dark:hover:bg-gray-700 rounded"
+          className="p-1 hover:bg-light-gray rounded"
           title="Attach file"
         >
           <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,3 +106,4 @@ export default function FileUpload({ messageId, accessToken, onUploadComplete }:
     </>
   );
 }
+

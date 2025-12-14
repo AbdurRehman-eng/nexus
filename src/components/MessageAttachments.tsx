@@ -33,7 +33,7 @@ export default function MessageAttachments({ attachments, currentUserId, onDelet
                 href={attachment.url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="block rounded-lg overflow-hidden border border-gray-300 dark:border-gray-600 hover:border-dark-red transition-colors"
+                className="block rounded-lg overflow-hidden border border-gray-300 hover:border-dark-red transition-colors"
               >
                 <img 
                   src={attachment.url} 
@@ -61,7 +61,7 @@ export default function MessageAttachments({ attachments, currentUserId, onDelet
         } else {
           // File attachment
           return (
-            <div key={attachment.id} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600 max-w-sm group">
+            <div key={attachment.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-300 max-w-sm group">
               <div className="text-3xl flex-shrink-0">
                 {getFileIcon(attachment.file_type)}
               </div>
@@ -80,7 +80,7 @@ export default function MessageAttachments({ attachments, currentUserId, onDelet
                 <a 
                   href={attachment.url} 
                   download={attachment.file_name}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                  className="p-1 hover:bg-gray-200 rounded"
                   title="Download"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,7 +90,7 @@ export default function MessageAttachments({ attachments, currentUserId, onDelet
                 {currentUserId === attachment.uploaded_by && onDelete && (
                   <button
                     onClick={() => onDelete(attachment.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-1 text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                     title="Delete"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,3 +106,4 @@ export default function MessageAttachments({ attachments, currentUserId, onDelet
     </div>
   );
 }
+

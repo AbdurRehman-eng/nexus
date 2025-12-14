@@ -10,7 +10,6 @@ import { getMessageAttachments, deleteAttachment } from '@/app/actions/files';
 import { createClient } from '@/lib/supabase/client';
 import EmojiPicker from '@/components/EmojiPicker';
 import MessageActions from '@/components/MessageActions';
-import ThemeToggle from '@/components/ThemeToggle';
 import FileUpload from '@/components/FileUpload';
 import MessageAttachments from '@/components/MessageAttachments';
 import toast from 'react-hot-toast';
@@ -492,14 +491,14 @@ export default function ChatPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 min-w-0">
+      <div className="flex-1 flex flex-col bg-white min-w-0">
         {/* Chat Header */}
-        <div className="h-14 sm:h-16 border-b border-gray-border dark:border-gray-700 px-3 sm:px-6 flex items-center justify-between">
+        <div className="h-14 sm:h-16 border-b border-gray-border px-3 sm:px-6 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             {/* Mobile Menu Button */}
             <button
               onClick={() => setShowSidebar(true)}
-              className="lg:hidden p-2 hover:bg-light-gray dark:hover:bg-gray-800 rounded -ml-2"
+              className="lg:hidden p-2 hover:bg-light-gray rounded -ml-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -508,7 +507,7 @@ export default function ChatPage() {
             
             <button 
               onClick={() => router.push('/homepage')}
-              className="hidden sm:block p-2 hover:bg-light-gray dark:hover:bg-gray-800 rounded"
+              className="hidden sm:block p-2 hover:bg-light-gray rounded"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -519,7 +518,7 @@ export default function ChatPage() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            <ThemeToggle />
+            
             
             <Link
               href="/ai-search"
@@ -530,7 +529,7 @@ export default function ChatPage() {
 
             <Link
               href={`/workspace/${workspaceId}/members`}
-              className="p-2 hover:bg-light-gray dark:hover:bg-gray-800 rounded"
+              className="p-2 hover:bg-light-gray rounded"
               title="Manage Members"
             >
               <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -540,7 +539,7 @@ export default function ChatPage() {
 
             <Link
               href={`/call/${workspaceId}`}
-              className="p-2 hover:bg-light-gray dark:hover:bg-gray-800 rounded"
+              className="p-2 hover:bg-light-gray rounded"
               title="Start Call"
             >
               <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -609,7 +608,7 @@ export default function ChatPage() {
                     </div>
                   ) : (
                     <>
-                      <p className="text-gray-800 dark:text-gray-200 text-sm sm:text-base break-words">{message.content}</p>
+                      <p className="text-gray-800 text-sm sm:text-base break-words">{message.content}</p>
                       <MessageAttachments 
                         attachments={message.attachments || []}
                         currentUserId={currentUserId}
@@ -636,7 +635,7 @@ export default function ChatPage() {
                               }
                             }}
                             className={`px-2 py-1 border rounded-full text-xs sm:text-sm hover:border-dark-red transition-colors ${
-                              isThisReaction ? 'bg-blue-50 border-dark-red dark:bg-blue-900' : 'bg-white border-gray-border dark:bg-gray-800'
+                              isThisReaction ? 'bg-blue-50 border-dark-red' : 'bg-white border-gray-border'
                             }`}
                           >
                             {reaction.emoji} {reaction.count}
@@ -691,18 +690,18 @@ export default function ChatPage() {
 
         {/* Reply Indicator */}
         {replyToMessage && (
-          <div className="px-3 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 border-t border-gray-300 dark:border-gray-700 flex items-center justify-between">
+          <div className="px-3 sm:px-4 py-2 bg-gray-100 border-t border-gray-300 flex items-center justify-between">
             <div className="flex items-center gap-2 min-w-0">
               <svg className="w-4 h-4 text-dark-red flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
-              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">
+              <span className="text-xs sm:text-sm text-gray-600 truncate">
                 Replying to <strong className="truncate">{replyToMessage.user}</strong>
               </span>
             </div>
             <button
               onClick={() => setReplyToMessage(null)}
-              className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex-shrink-0 ml-2"
+              className="text-gray-500 hover:text-gray-700 flex-shrink-0 ml-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -712,10 +711,10 @@ export default function ChatPage() {
         )}
 
         {/* Message Input */}
-        <div className="p-3 sm:p-4 border-t border-gray-border dark:border-gray-700">
+        <div className="p-3 sm:p-4 border-t border-gray-border">
           <form onSubmit={handleSendMessage}>
             <div className="flex items-end gap-2">
-              <div className="flex-1 border border-gray-border dark:border-gray-700 rounded-input bg-white dark:bg-gray-800">
+              <div className="flex-1 border border-gray-border rounded-input bg-white">
                 <textarea
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
@@ -730,7 +729,7 @@ export default function ChatPage() {
                     }
                   }}
                 />
-                <div className="flex items-center gap-2 px-3 sm:px-4 py-2 border-t border-gray-border dark:border-gray-700">
+                <div className="flex items-center gap-2 px-3 sm:px-4 py-2 border-t border-gray-border">
                   {messages.length > 0 && messages[messages.length - 1] && (
                     <FileUpload 
                       messageId={messages[messages.length - 1].id}
@@ -754,12 +753,12 @@ export default function ChatPage() {
 
       {/* Thread View Sidebar */}
       {showThreadView && (
-        <div className="hidden md:flex w-80 lg:w-96 border-l border-gray-border dark:border-gray-700 bg-white dark:bg-gray-900 flex-col">
-          <div className="p-4 border-b border-gray-border dark:border-gray-700 flex items-center justify-between">
+        <div className="hidden md:flex w-80 lg:w-96 border-l border-gray-border bg-white flex-col">
+          <div className="p-4 border-b border-gray-border flex items-center justify-between">
             <h2 className="font-bold">Thread</h2>
             <button
               onClick={() => setShowThreadView(false)}
-              className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              className="text-gray-500 hover:text-gray-700"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -768,7 +767,7 @@ export default function ChatPage() {
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {threadMessages.map((msg, idx) => (
-              <div key={msg.id} className={idx === 0 ? 'pb-4 border-b border-gray-300 dark:border-gray-700' : ''}>
+              <div key={msg.id} className={idx === 0 ? 'pb-4 border-b border-gray-300' : ''}>
                 <div className="flex gap-3">
                   <div className="w-8 h-8 rounded bg-dark-red text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
                     {msg.avatar}
@@ -778,7 +777,7 @@ export default function ChatPage() {
                       <span className="font-semibold text-sm truncate">{msg.user}</span>
                       <span className="text-xs text-gray-500 flex-shrink-0">{msg.timestamp}</span>
                     </div>
-                    <p className="text-sm text-gray-800 dark:text-gray-200 break-words">{msg.content}</p>
+                    <p className="text-sm text-gray-800 break-words">{msg.content}</p>
                   </div>
                 </div>
               </div>
@@ -790,10 +789,10 @@ export default function ChatPage() {
       {/* Add Channel Modal */}
       {showAddChannelModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create Channel</h2>
+                <h2 className="text-2xl font-bold text-gray-900">Create Channel</h2>
                 <button
                   onClick={() => {
                     setShowAddChannelModal(false);
@@ -801,7 +800,7 @@ export default function ChatPage() {
                     setNewChannelDescription('');
                     setNewChannelIsPrivate(false);
                   }}
-                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  className="text-gray-500 hover:text-gray-700"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -811,17 +810,17 @@ export default function ChatPage() {
 
               <form onSubmit={handleCreateChannel} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Channel Name
                   </label>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-500 dark:text-gray-400 text-lg">#</span>
+                    <span className="text-gray-500 text-lg">#</span>
                     <input
                       type="text"
                       value={newChannelName}
                       onChange={(e) => setNewChannelName(e.target.value)}
                       placeholder="e.g. marketing"
-                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-dark-red dark:bg-gray-700 dark:text-white"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dark-red"
                       disabled={creatingChannel}
                       autoFocus
                     />
@@ -829,14 +828,14 @@ export default function ChatPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description (Optional)
                   </label>
                   <textarea
                     value={newChannelDescription}
                     onChange={(e) => setNewChannelDescription(e.target.value)}
                     placeholder="What's this channel about?"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-dark-red dark:bg-gray-700 dark:text-white resize-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dark-red resize-none"
                     rows={3}
                     disabled={creatingChannel}
                   />
@@ -851,7 +850,7 @@ export default function ChatPage() {
                     className="w-4 h-4 text-dark-red border-gray-300 rounded focus:ring-dark-red"
                     disabled={creatingChannel}
                   />
-                  <label htmlFor="isPrivate" className="text-sm text-gray-700 dark:text-gray-300">
+                  <label htmlFor="isPrivate" className="text-sm text-gray-700">
                     Make this channel private (only invited members can access)
                   </label>
                 </div>
@@ -865,7 +864,7 @@ export default function ChatPage() {
                       setNewChannelDescription('');
                       setNewChannelIsPrivate(false);
                     }}
-                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-semibold"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-semibold"
                     disabled={creatingChannel}
                   >
                     Cancel
@@ -886,3 +885,6 @@ export default function ChatPage() {
     </div>
   );
 }
+
+
+

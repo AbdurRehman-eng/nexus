@@ -105,32 +105,32 @@ export default function WorkspaceMembersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-chat-bg dark:bg-gray-900 p-8">
+    <div className="min-h-screen bg-chat-bg p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
             <button
               onClick={() => router.push(`/chat/${workspaceId}`)}
-              className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white mb-2"
+              className="text-gray-600 hover:text-gray-900 mb-2"
             >
               ← Back to Workspace
             </button>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Workspace Members</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">{members.length} members</p>
+            <h1 className="text-3xl font-bold text-gray-900">Workspace Members</h1>
+            <p className="text-gray-600 mt-1">{members.length} members</p>
           </div>
         </div>
 
         {/* Add Member Form */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Add New Member</h2>
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-gray-900">Add New Member</h2>
           <form onSubmit={handleAddMember} className="flex gap-4">
             <input
               type="email"
               value={newMemberEmail}
               onChange={(e) => setNewMemberEmail(e.target.value)}
               placeholder="Enter member's email address"
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-dark-red dark:bg-gray-700 dark:text-white"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-dark-red"
               disabled={adding}
             />
             <button
@@ -141,20 +141,20 @@ export default function WorkspaceMembersPage() {
               {adding ? 'Adding...' : 'Add Member'}
             </button>
           </form>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+          <p className="text-sm text-gray-500 mt-2">
             Members will be automatically added to all public channels
           </p>
         </div>
 
         {/* Members List */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md">
+        <div className="bg-white rounded-lg shadow-md">
           <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Current Members</h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-900">Current Members</h2>
             <div className="space-y-4">
               {members.map((member) => (
                 <div
                   key={member.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
                 >
                   <div className="flex items-center gap-4">
                     {member.avatar_url ? (
@@ -169,24 +169,24 @@ export default function WorkspaceMembersPage() {
                       </div>
                     )}
                     <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">{member.username}</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{member.email}</p>
+                      <p className="font-semibold text-gray-900">{member.username}</p>
+                      <p className="text-sm text-gray-600">{member.email}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                       member.role === 'owner'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        ? 'bg-yellow-100 text-yellow-800'
                         : member.role === 'admin'
-                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-gray-100 text-gray-800'
                     }`}>
                       {member.role}
                     </span>
                     {member.role !== 'owner' && (
                       <button
                         onClick={() => handleRemoveMember(member.id, member.username || member.email)}
-                        className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 font-medium"
+                        className="text-red-600 hover:text-red-800 font-medium"
                       >
                         Remove
                       </button>
@@ -201,3 +201,5 @@ export default function WorkspaceMembersPage() {
     </div>
   );
 }
+
+

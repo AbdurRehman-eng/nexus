@@ -41,7 +41,7 @@ export default function EmojiPicker({ onEmojiSelect, onClose }: EmojiPickerProps
   return (
     <div
       ref={pickerRef}
-      className={`absolute right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg p-3 z-50 ${
+      className={`absolute right-0 bg-white border border-gray-300 rounded-lg shadow-lg p-3 z-50 ${
         position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
       }`}
       style={{ width: '280px', maxWidth: 'calc(100vw - 40px)' }}
@@ -54,7 +54,7 @@ export default function EmojiPicker({ onEmojiSelect, onClose }: EmojiPickerProps
               onEmojiSelect(emoji);
               onClose();
             }}
-            className="text-2xl hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-2 transition-colors"
+            className="text-2xl hover:bg-gray-100 rounded p-2 transition-colors"
             type="button"
           >
             {emoji}
@@ -64,3 +64,4 @@ export default function EmojiPicker({ onEmojiSelect, onClose }: EmojiPickerProps
     </div>
   );
 }
+

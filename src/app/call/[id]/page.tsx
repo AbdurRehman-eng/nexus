@@ -21,6 +21,7 @@ export default function CallPage() {
 
   const [accessToken, setAccessToken] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
+  const [currentUserName, setCurrentUserName] = useState('You');
   const [callId, setCallId] = useState<string | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isMuted, setIsMuted] = useState(false);
@@ -44,6 +45,8 @@ export default function CallPage() {
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const supabaseChannelRef = useRef<any>(null);
+  // Buffer for streams that arrive before video elements are ready
+  const pendingStreams = useRef<Map<string, MediaStream>>(new Map());
 
   // Initialize call
   useEffect(() => {
@@ -53,6 +56,32 @@ export default function CallPage() {
       cleanup();
     };
   }, [workspaceId]);
+
+  // Effect to attach pending streams to video elements that were created before stream arrived
+  useEffect(() => {
+    // Check if there are any pending streams that now have video elements
+    const pendingIds = Array.from(pendingStreams.current.keys());
+    
+    if (pendingIds.length > 0) {
+      console.log('[Call] 🔍 Checking for pending streams:', pendingIds);
+    }
+    
+    for (const participantId of pendingIds) {
+      const videoElement = videoRefs.current.get(participantId);
+      const stream = pendingStreams.current.get(participantId);
+      
+      if (videoElement && stream) {
+        console.log('[Call] 🔄 Attaching pending stream to now-available video element:', participantId);
+        videoElement.srcObject = stream;
+        pendingStreams.current.delete(participantId);
+        videoElement.play().catch(err => {
+          if (err.name !== 'AbortError') {
+            console.error('[Call] Error playing pending video:', err);
+          }
+        });
+      }
+    }
+  }, [participants]); // Re-check when participants change (new video elements might be rendered)
 
   // Unified video management - handles all camera states
   useEffect(() => {
@@ -151,14 +180,25 @@ export default function CallPage() {
       
       // Setup WebRTC callbacks
       webrtc.onTrack((participantId, stream) => {
-        console.log('[Call] Received stream from:', participantId);
+        console.log('[Call] 📹 Received stream from:', participantId);
+        console.log('[Call] Stream has', stream.getVideoTracks().length, 'video tracks and', stream.getAudioTracks().length, 'audio tracks');
+        
         const videoElement = videoRefs.current.get(participantId);
         if (videoElement) {
+          console.log('[Call] ✅ Video element found, attaching stream');
           videoElement.srcObject = stream;
           // Ensure remote video plays
           videoElement.play().catch(error => {
-            console.error('[Call] Error playing remote video:', error);
+            if (error.name !== 'AbortError') {
+              console.error('[Call] ❌ Error playing remote video:', error);
+            }
           });
+        } else {
+          console.warn('[Call] ⏳ Video element not ready yet for participant:', participantId);
+          console.log('[Call] Buffering stream until video element is ready');
+          console.log('[Call] Available video refs:', Array.from(videoRefs.current.keys()));
+          // Buffer the stream until the video element is ready
+          pendingStreams.current.set(participantId, stream);
         }
       });
 
@@ -197,57 +237,132 @@ export default function CallPage() {
       // Ignore messages from self
       if (payload.from === userId) return;
 
+      console.log('[Call] ========================================');
       console.log('[Call] Received signal:', payload.type, 'from:', payload.from);
+      console.log('[Call] My ID:', userId);
+      console.log('[Call] Current participants:', participants.map(p => p.id));
+      console.log('[Call] Active connections:', webrtcRef.current?.getActivePeerConnections());
+      console.log('[Call] ========================================');
 
       try {
         switch (payload.type) {
           case 'user-joined':
-            if (payload.participant) {
-              // New user joined - add to participants
-              setParticipants(prev => {
-                if (prev.find(p => p.id === payload.participant!.id)) return prev;
-                return [...prev, payload.participant!];
-              });
-
-              // Use deterministic rule: only the user with smaller ID creates offer
-              // This prevents both users from creating offers simultaneously
-              const shouldCreateOffer = userId < payload.participant.id;
+            console.log('[Call] Processing user-joined, payload.participant:', payload.participant);
+            if (!payload.participant) {
+              console.error('[Call] ❌ user-joined received but payload.participant is missing!');
+              console.error('[Call] Full payload:', payload);
+              break;
+            }
+            
+            // Check if we already have a peer connection (more reliable than state check)
+            const hasConnection = webrtcRef.current?.getActivePeerConnections().includes(payload.participant.id);
               
-              if (shouldCreateOffer) {
-                console.log('[Call] I have smaller ID, creating offer to:', payload.participant.id);
+            
+            if (hasConnection) {
+              console.log('[Call] Already have connection with', payload.participant.id, '- ignoring duplicate user-joined');
+              break;
+            }
+
+            // Check for existing participant using functional state update to get current value
+            let shouldAdd = false;
+            setParticipants(prev => {
+              const exists = prev.find(p => p.id === payload.participant!.id);
+              if (exists) {
+                console.log('[Call] Participant already in list, ignoring duplicate user-joined');
+                return prev;
+              }
+              shouldAdd = true;
+              console.log('[Call] Adding new participant:', payload.participant!.name);
+              return [...prev, payload.participant!];
+            });
+
+            // Only proceed if we actually added the participant
+            if (!shouldAdd) {
+              console.log('[Call] ⏭️ Participant not added (duplicate), skipping offer creation');
+              break;
+            }
+            
+            console.log('[Call] ✅ New participant added, proceeding with offer logic');
+
+            // Use deterministic rule: only the user with smaller ID creates offer
+            // This prevents both users from creating offers simultaneously
+            const shouldCreateOffer = userId < payload.participant.id;
+            
+            console.log('[Call] Comparing IDs:', {
+              myId: userId,
+              theirId: payload.participant.id,
+              shouldCreateOffer,
+              comparison: `${userId} < ${payload.participant.id} = ${shouldCreateOffer}`
+            });
+            
+            if (shouldCreateOffer) {
+              console.log('[Call] ✅ I have smaller ID, creating offer to:', payload.participant.id);
+              try {
                 await webrtcRef.current.createOffer(payload.participant.id, (signal) => {
+                  console.log('[Call] 📤 Sending offer signal to:', payload.participant.id);
                   channel.send({
                     type: 'broadcast',
                     event: 'signal',
                     payload: signal
                   });
                 });
-              } else {
-                console.log('[Call] Other user has smaller ID, waiting for their offer');
+                console.log('[Call] ✅ Offer created and sent successfully');
+              } catch (error) {
+                console.error('[Call] ❌ Error creating offer:', error);
               }
+            } else {
+              console.log('[Call] ⏳ Other user has smaller ID, waiting for their offer');
             }
             break;
 
           case 'offer':
+            console.log('[Call] 📥 Received offer - to:', payload.to, 'from:', payload.from, 'myId:', userId);
             if (payload.to === userId && payload.offer) {
-              await webrtcRef.current.handleOffer(payload.from, payload.offer, (signal) => {
-                channel.send({
-                  type: 'broadcast',
-                  event: 'signal',
-                  payload: signal
+              console.log('[Call] ✅ Offer is for me! Creating answer...');
+              try {
+                await webrtcRef.current.handleOffer(payload.from, payload.offer, (signal) => {
+                  console.log('[Call] 📤 Sending answer to:', payload.from);
+                  channel.send({
+                    type: 'broadcast',
+                    event: 'signal',
+                    payload: signal
+                  });
                 });
-              });
+                console.log('[Call] ✅ Answer created and sent successfully');
+              } catch (error) {
+                console.error('[Call] ❌ Error handling offer:', error);
+              }
+            } else {
+              console.log('[Call] ⏭️ Offer not for me, ignoring');
             }
             break;
 
           case 'answer':
+            console.log('[Call] 📥 Received answer - to:', payload.to, 'from:', payload.from, 'myId:', userId);
             if (payload.to === userId && payload.answer) {
-              await webrtcRef.current.handleAnswer(payload.from, payload.answer);
+              console.log('[Call] ✅ Answer is for me! Processing...');
+              console.log('[Call] Answer payload:', payload.answer);
+              
+              // Check if we have a peer connection waiting for this answer
+              const peerConnections = webrtcRef.current?.getActivePeerConnections() || [];
+              console.log('[Call] Current peer connections:', peerConnections);
+              console.log('[Call] Looking for peer connection with:', payload.from);
+              
+              try {
+                await webrtcRef.current.handleAnswer(payload.from, payload.answer);
+                console.log('[Call] ✅ Answer processed successfully from:', payload.from);
+              } catch (error) {
+                console.error('[Call] ❌ Error handling answer:', error);
+                console.error('[Call] Error details:', error);
+              }
+            } else {
+              console.log('[Call] ⏭️ Answer not for me, ignoring');
             }
             break;
 
           case 'ice-candidate':
             if (payload.to === userId && payload.candidate) {
+              console.log('[Call] 🧊 Received ICE candidate from:', payload.from);
               await webrtcRef.current.handleIceCandidate(payload.from, payload.candidate);
             }
             break;
@@ -294,10 +409,15 @@ export default function CallPage() {
       }
     });
 
-    // Subscribe to participant changes
+    // Subscribe to participant changes - REMOVED
+    // We don't need postgres_changes for INSERT because the broadcast handles it
+    // postgres_changes was causing duplicate participant additions without WebRTC setup
+
+    // Listen for participants leaving
     channel.on('postgres_changes', 
-      { event: '*', schema: 'public', table: 'call_participants', filter: `call_id=eq.${callId}` },
+      { event: 'DELETE', schema: 'public', table: 'call_participants', filter: `call_id=eq.${callId}` },
       async () => {
+        console.log('[Call] Participant left (detected via postgres_changes)');
         // Reload participants
         const result = await getCallParticipants(token, callId);
         if (result.data) {
@@ -306,41 +426,87 @@ export default function CallPage() {
       }
     );
 
-    await channel.subscribe();
+    // Subscribe and wait for it to be ready
+    await channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('[Call] Successfully subscribed to call channel');
+      }
+    });
+    
     supabaseChannelRef.current = channel;
+
+    // Small delay to ensure channel is fully ready
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Load initial participants
     const result = await getCallParticipants(token, callId);
+    
+    let existingParticipants: any[] = [];
+    
     if (result.data) {
-      setParticipants(result.data);
+      const otherParticipants = result.data.filter(p => p.id !== userId);
+      existingParticipants = otherParticipants;
       
-      // Create WebRTC connections with existing participants
-      // Use deterministic rule: only create offer if our ID is smaller
-      console.log('[Call] Found', result.data.length, 'existing participants');
-      for (const participant of result.data) {
-        if (participant.id !== userId && webrtcRef.current) {
-          const shouldCreateOffer = userId < participant.id;
+      // IMPORTANT: Only set SELF in participants initially
+      // Other participants will be added via their "user-joined" broadcasts
+      // This ensures clean state management
+      const currentUser = result.data.find(p => p.id === userId);
+      setParticipants(currentUser ? [currentUser] : []);
+      
+      console.log('[Call] Loaded', result.data.length, 'total participants from database');
+      console.log('[Call] Found', otherParticipants.length, 'existing participants (excluding self)');
+      console.log('[Call] Setting only self in state initially');
+      
+      // If I'm joining an existing call with participants, I need to initiate connections
+      // For participants with LARGER IDs, I create offers
+      // For participants with SMALLER IDs, they'll receive my broadcast and create offers
+      for (const participant of otherParticipants) {
+        const shouldCreateOffer = userId < participant.id;
+        
+        if (shouldCreateOffer) {
+          console.log('[Call] 🎯 I have smaller ID - creating offer for existing participant:', participant.id);
           
-          if (shouldCreateOffer) {
-            console.log('[Call] Creating offer for existing participant:', participant.id);
-            await webrtcRef.current.createOffer(participant.id, (signal) => {
+          // Add participant to state first
+          setParticipants(prev => [...prev, participant]);
+          
+          // Then create WebRTC offer
+          try {
+            await webrtcRef.current!.createOffer(participant.id, (signal) => {
+              console.log('[Call] 📤 Sending offer to existing participant:', participant.id);
               channel.send({
                 type: 'broadcast',
                 event: 'signal',
                 payload: signal
               });
             });
-          } else {
-            console.log('[Call] Waiting for offer from existing participant:', participant.id);
+          } catch (error) {
+            console.error('[Call] ❌ Error creating offer to existing participant:', error);
           }
+        } else {
+          console.log('[Call] ⏳ Participant', participant.id, 'has smaller ID - will wait for their offer after I broadcast');
         }
       }
     }
 
     // Get current user profile for announcement
     const currentUser = result.data?.find(p => p.id === userId);
+    const userName = currentUser?.name || 'User';
     
-    // Announce our joining with actual profile data
+    // Store current user name for emojis
+    setCurrentUserName(userName);
+    
+    // Calculate other participants count for logging
+    const otherParticipantsCount = result.data ? result.data.filter(p => p.id !== userId).length : 0;
+    
+    // ALWAYS announce our joining, even if alone
+    // Other users might join after we check but before their listener is set up
+    console.log('[Call] 📢 Broadcasting user-joined announcement');
+    console.log('[Call] My details:', {
+      id: userId,
+      name: userName,
+      otherParticipantsCount
+    });
+    
     channel.send({
       type: 'broadcast',
       event: 'signal',
@@ -349,7 +515,7 @@ export default function CallPage() {
         from: userId,
         participant: {
           id: userId,
-          name: currentUser?.name || 'User',
+          name: userName,
           avatar: currentUser?.avatar || 'U',
           isMuted: false,
           isCameraOff: false
@@ -450,9 +616,8 @@ export default function CallPage() {
   const handleSendEmoji = (emoji: string) => {
     if (!supabaseChannelRef.current || !currentUserId) return;
 
-    // Get participant name
-    const currentParticipant = participants.find(p => p.id === currentUserId);
-    const userName = currentParticipant?.name || 'You';
+    // Use stored current user name
+    const userName = currentUserName;
 
     // Broadcast emoji to all participants
     supabaseChannelRef.current.send({
@@ -634,10 +799,27 @@ export default function CallPage() {
                 <video
                   ref={(el) => {
                     if (el) {
+                      console.log('[Call] 📺 Video element created for participant:', participant.id);
                       videoRefs.current.set(participant.id, el);
-                      // Ensure video plays when element is created
-                      if (el.srcObject) {
-                        el.play().catch(err => console.error('[Call] Error playing remote video:', err));
+                      
+                      // Check if there's a pending stream waiting for this element
+                      const pendingStream = pendingStreams.current.get(participant.id);
+                      if (pendingStream) {
+                        console.log('[Call] ✅ Found pending stream, attaching now!');
+                        el.srcObject = pendingStream;
+                        pendingStreams.current.delete(participant.id);
+                        el.play().catch(err => {
+                          if (err.name !== 'AbortError') {
+                            console.error('[Call] Error playing remote video:', err);
+                          }
+                        });
+                      } else if (el.srcObject) {
+                        // Ensure video plays when element is created with existing stream
+                        el.play().catch(err => {
+                          if (err.name !== 'AbortError') {
+                            console.error('[Call] Error playing remote video:', err);
+                          }
+                        });
                       }
                     }
                   }}
@@ -646,9 +828,11 @@ export default function CallPage() {
                   className="w-full h-full object-cover"
                   onLoadedMetadata={(e) => {
                     console.log('[Call] Remote video metadata loaded for:', participant.id);
-                    (e.target as HTMLVideoElement).play().catch(err => 
-                      console.error('[Call] Error playing remote video:', err)
-                    );
+                    (e.target as HTMLVideoElement).play().catch(err => {
+                      if (err.name !== 'AbortError') {
+                        console.error('[Call] Error auto-playing remote video:', err);
+                      }
+                    });
                   }}
                 />
               )}
