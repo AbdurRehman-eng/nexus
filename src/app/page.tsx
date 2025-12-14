@@ -99,12 +99,6 @@ export default function LandingPage() {
         
         {/* Content Overlay */}
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-16 md:py-20 text-center" style={{ minHeight: '600px' }}>
-          <div className="mb-6 sm:mb-8">
-            <span className="inline-block px-4 py-2 bg-red-50 text-dark-red text-xs sm:text-sm font-semibold rounded-full mb-6">
-              🚀 Collaborate Better, Work Faster
-            </span>
-          </div>
-          
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-dark-red mb-6 sm:mb-8 px-4 leading-tight">
             WORK SMARTER,<br />NOT HARDER
           </h1>
@@ -167,13 +161,13 @@ export default function LandingPage() {
       </section>
 
       {/* Why NEXUS Section */}
-      <section className="bg-gray-50 py-16 sm:py-20 md:py-24">
+      <section className="bg-gradient-to-br from-dark-red to-maroon py-16 sm:py-20 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
               Why Choose NEXUS?
             </h2>
-            <p className="text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-lg sm:text-xl text-red-100 max-w-2xl mx-auto">
               Everything your team needs to collaborate effectively, all in one place.
             </p>
           </div>
