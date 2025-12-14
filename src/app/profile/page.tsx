@@ -14,6 +14,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null);
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     username: '',
@@ -96,6 +98,68 @@ export default function ProfilePage() {
     }
     
     setSaving(false);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size must be less than 5MB');
+      return;
+    }
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setUploadingImage(true);
+    setError('');
+
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+
+    // Convert file to ArrayBuffer
+    const arrayBuffer = await file.arrayBuffer();
+
+    const result = await uploadProfileImage(session.access_token, {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      arrayBuffer: arrayBuffer
+    });
+
+    if (result.error) {
+      setError(result.error);
+      toast.error(result.error);
+      setImagePreview(null);
+    } else {
+      // Update form data and profile with new image URL
+      setFormData({ ...formData, avatar_url: result.data?.url || '' });
+      if (result.data?.profile) {
+        setProfile(result.data.profile);
+      }
+      toast.success('Profile image uploaded successfully!');
+    }
+
+    setUploadingImage(false);
+    // Clear file input
+    e.target.value = '';
   };
 
   const getInitials = () => {
@@ -193,42 +257,54 @@ export default function ProfilePage() {
           <div className="space-y-6">
             {/* Profile Picture */}
             <div className="flex items-center gap-6">
-              <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-dark-red text-white flex items-center justify-center text-3xl sm:text-4xl font-bold flex-shrink-0 overflow-hidden">
-                {profile?.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.username || 'Profile'}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Fallback to initials if image fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      const parent = target.parentElement;
-                      if (parent) {
-                        parent.textContent = getInitials();
-                      }
-                    }}
-                  />
-                ) : (
-                  getInitials()
+              <div className="relative">
+                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-dark-red text-white flex items-center justify-center text-3xl sm:text-4xl font-bold flex-shrink-0 overflow-hidden">
+                  {(imagePreview || profile?.avatar_url) ? (
+                    <img
+                      src={imagePreview || profile.avatar_url}
+                      alt={profile?.username || 'Profile'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.textContent = getInitials();
+                        }
+                      }}
+                    />
+                  ) : (
+                    getInitials()
+                  )}
+                </div>
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                  </div>
                 )}
               </div>
               <div className="flex-1">
                 {isEditing && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Avatar URL
+                      Profile Picture
                     </label>
                     <input
-                      type="url"
-                      value={formData.avatar_url}
-                      onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-                      placeholder="https://example.com/avatar.jpg"
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={handleImageUpload}
+                      disabled={uploadingImage}
                       className="input-field"
                     />
                     <p className="text-xs text-gray-500 mt-1">
-                      Enter a URL to your profile picture
+                      Upload an image (JPEG, PNG, GIF, or WebP, max 5MB)
                     </p>
+                    {profile?.avatar_url && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Current: <a href={profile.avatar_url} target="_blank" rel="noopener noreferrer" className="text-dark-red hover:underline">View current image</a>
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
