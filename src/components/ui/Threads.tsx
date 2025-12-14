@@ -7,6 +7,7 @@ interface ThreadsProps {
   distance?: number;
   enableMouseInteraction?: boolean;
   className?: string;
+  color?: [number, number, number]; // RGB color array
 }
 
 export default function Threads({
@@ -14,6 +15,7 @@ export default function Threads({
   distance = 0,
   enableMouseInteraction = true,
   className = '',
+  color = [107, 114, 128], // Default dark gray (gray-600)
 }: ThreadsProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
@@ -76,7 +78,8 @@ export default function Threads({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       time += 0.01;
 
-      ctx.strokeStyle = 'rgba(107, 114, 128, 0.4)'; // gray-600 with opacity (dark grayish)
+      const [r, g, b] = color;
+      ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.4)`;
       ctx.lineWidth = 1;
 
       threads.forEach((thread, i) => {
@@ -110,7 +113,8 @@ export default function Threads({
 
           if (dist < (distance || 150)) {
             const opacity = 1 - dist / (distance || 150);
-            ctx.strokeStyle = `rgba(156, 163, 175, ${opacity * 0.3})`;
+            const [r, g, b] = color;
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${opacity * 0.4})`;
             ctx.beginPath();
             ctx.moveTo(thread.x, thread.y);
             ctx.lineTo(otherThread.x, otherThread.y);
@@ -119,7 +123,8 @@ export default function Threads({
         });
 
         // Draw thread point
-        ctx.fillStyle = 'rgba(107, 114, 128, 0.6)'; // gray-600 (dark grayish)
+        const [r, g, b] = color;
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.6)`;
         ctx.beginPath();
         ctx.arc(thread.x, thread.y, 2, 0, Math.PI * 2);
         ctx.fill();
@@ -139,13 +144,16 @@ export default function Threads({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [amplitude, distance, enableMouseInteraction]);
+  }, [amplitude, distance, enableMouseInteraction, color]);
 
   return (
     <canvas
       ref={canvasRef}
-      className={`absolute inset-0 w-full h-full ${className}`}
-      style={{ pointerEvents: enableMouseInteraction ? 'auto' : 'none' }}
+      className={`w-full h-full ${className}`}
+      style={{ 
+        pointerEvents: enableMouseInteraction ? 'auto' : 'none',
+        display: 'block'
+      }}
     />
   );
 }
