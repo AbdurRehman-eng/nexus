@@ -76,7 +76,7 @@ export default function Threads({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       time += 0.01;
 
-      ctx.strokeStyle = 'rgba(156, 163, 175, 0.3)'; // gray-400 with opacity
+      ctx.strokeStyle = 'rgba(107, 114, 128, 0.4)'; // gray-600 with opacity (dark grayish)
       ctx.lineWidth = 1;
 
       threads.forEach((thread, i) => {
@@ -119,7 +119,7 @@ export default function Threads({
         });
 
         // Draw thread point
-        ctx.fillStyle = 'rgba(156, 163, 175, 0.5)';
+        ctx.fillStyle = 'rgba(107, 114, 128, 0.6)'; // gray-600 (dark grayish)
         ctx.beginPath();
         ctx.arc(thread.x, thread.y, 2, 0, Math.PI * 2);
         ctx.fill();
@@ -149,3 +149,4 @@ export default function Threads({
     />
   );
 }
+

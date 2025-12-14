@@ -85,18 +85,8 @@ export default function LandingPage() {
       <Navbar />
       
       {/* Hero Section */}
-      <section className="flex-grow relative overflow-hidden">
-        {/* Threads Background */}
-        <div className="absolute inset-0 w-full h-full" style={{ minHeight: '600px' }}>
-          <Threads
-            amplitude={1}
-            distance={0}
-            enableMouseInteraction={true}
-          />
-        </div>
-        
-        {/* Content Overlay */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-16 md:py-20 text-center">
+      <section className="flex-grow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-16 md:py-20 text-center">
           <div className="mb-6 sm:mb-8">
             <span className="inline-block px-4 py-2 bg-red-50 text-dark-red text-xs sm:text-sm font-semibold rounded-full mb-6">
               🚀 Collaborate Better, Work Faster
@@ -161,7 +151,6 @@ export default function LandingPage() {
               <p className="text-gray-600 leading-relaxed">Find exactly what you need with intelligent search that understands context and learns from your workflow.</p>
             </div>
           </div>
-        </div>
         </div>
       </section>
 
