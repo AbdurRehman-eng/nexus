@@ -6,11 +6,23 @@ import { useRouter, useParams } from 'next/navigation';
 import { getChannels } from '@/app/actions/channels';
 import { getMessages, sendMessage, getMessageReactions, addReaction, removeReaction, editMessage, deleteMessage } from '@/app/actions/messages';
 import { getWorkspace } from '@/app/actions/workspaces';
+import { getMessageAttachments, deleteAttachment } from '@/app/actions/files';
 import { createClient } from '@/lib/supabase/client';
 import EmojiPicker from '@/components/EmojiPicker';
 import MessageActions from '@/components/MessageActions';
 import ThemeToggle from '@/components/ThemeToggle';
+import FileUpload from '@/components/FileUpload';
+import MessageAttachments from '@/components/MessageAttachments';
 import toast from 'react-hot-toast';
+
+interface Attachment {
+  id: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  url: string;
+  uploaded_by: string;
+}
 
 interface Message {
   id: string;
@@ -23,6 +35,7 @@ interface Message {
   threadId?: string | null;
   editedAt?: string;
   deletedAt?: string;
+  attachments?: Attachment[];
 }
 
 interface Channel {
@@ -141,6 +154,7 @@ export default function ChatPage() {
     } else {
       const formattedMessages = await Promise.all((result.data || []).map(async (msg) => {
         const reactionsResult = await getMessageReactions(accessToken, msg.id);
+        const attachmentsResult = await getMessageAttachments(accessToken, msg.id);
         return {
           id: msg.id,
           user: msg.user,
@@ -153,6 +167,7 @@ export default function ChatPage() {
           senderId: msg.senderId,
           reactions: reactionsResult.data || [],
           threadId: msg.threadId,
+          attachments: attachmentsResult.data || [],
         };
       }));
       setMessages(formattedMessages);
@@ -304,8 +319,21 @@ export default function ChatPage() {
     setShowThreadView(true);
   };
 
-  const handleFileUpload = () => {
-    toast.error('File upload functionality coming soon!');
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    if (!accessToken) return;
+    
+    if (!confirm('Are you sure you want to delete this attachment?')) return;
+    
+    const result = await deleteAttachment(accessToken, attachmentId);
+    
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Attachment deleted!');
+      if (activeChannelId) {
+        await loadMessages(activeChannelId);
+      }
+    }
   };
 
   const getThreadCount = (messageId: string) => {
@@ -495,7 +523,14 @@ export default function ChatPage() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-gray-800 dark:text-gray-200 text-sm sm:text-base break-words">{message.content}</p>
+                    <>
+                      <p className="text-gray-800 dark:text-gray-200 text-sm sm:text-base break-words">{message.content}</p>
+                      <MessageAttachments 
+                        attachments={message.attachments || []}
+                        currentUserId={currentUserId}
+                        onDelete={handleDeleteAttachment}
+                      />
+                    </>
                   )}
                   
                   {message.reactions && message.reactions.length > 0 && (
@@ -611,16 +646,13 @@ export default function ChatPage() {
                   }}
                 />
                 <div className="flex items-center gap-2 px-3 sm:px-4 py-2 border-t border-gray-border dark:border-gray-700">
-                  <button
-                    type="button"
-                    onClick={handleFileUpload}
-                    className="p-1 hover:bg-light-gray dark:hover:bg-gray-700 rounded"
-                    title="Attach file"
-                  >
-                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                  </button>
+                  {messages.length > 0 && messages[messages.length - 1] && (
+                    <FileUpload 
+                      messageId={messages[messages.length - 1].id}
+                      accessToken={accessToken}
+                      onUploadComplete={() => activeChannelId && loadMessages(activeChannelId)}
+                    />
+                  )}
                 </div>
               </div>
               <button
