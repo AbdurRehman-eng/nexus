@@ -1,7 +1,83 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import Navbar from '@/components/Navbar';
 
 export default function LandingPage() {
+  const router = useRouter();
+  const [isProcessingAuth, setIsProcessingAuth] = useState(false);
+
+  useEffect(() => {
+    // Check if we have OAuth tokens in the URL hash (fallback handler)
+    const handleOAuthCallback = async () => {
+      if (typeof window === 'undefined') return;
+
+      const hash = window.location.hash;
+      
+      // Check if we have access_token in hash (OAuth callback)
+      if (hash && hash.includes('access_token=')) {
+        console.log('[Landing Page] OAuth tokens detected in URL, processing...');
+        setIsProcessingAuth(true);
+
+        try {
+          const supabase = createClient();
+          
+          // Parse hash fragments
+          const hashParams = new URLSearchParams(hash.substring(1));
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          
+          if (accessToken) {
+            console.log('[Landing Page] Setting session from OAuth tokens');
+            
+            // Set the session
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || '',
+            });
+            
+            if (error) {
+              console.error('[Landing Page] Failed to set session:', error);
+              // Clear hash and show error
+              window.location.hash = '';
+              alert('Failed to complete sign in. Please try again.');
+              setIsProcessingAuth(false);
+              return;
+            }
+            
+            if (data.session) {
+              console.log('[Landing Page] ✅ Session set successfully, redirecting to homepage');
+              // Clear the hash before redirecting
+              window.history.replaceState(null, '', window.location.pathname);
+              router.push('/homepage');
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('[Landing Page] Error processing OAuth callback:', err);
+          setIsProcessingAuth(false);
+        }
+      }
+    };
+
+    handleOAuthCallback();
+  }, [router]);
+
+  // Show loading state if processing OAuth
+  if (isProcessingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-dark-red mb-4"></div>
+          <p className="text-gray-600 text-lg">Completing sign in...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
