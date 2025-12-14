@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import StarBorder from '@/components/ui/StarBorder';
-import Threads from '@/components/ui/Threads';
+import StarBorder from '@/components/StarBorder';
+import Threads from '@/components/Threads';
 
 export default function LandingPage() {
   const router = useRouter();
@@ -93,7 +93,7 @@ export default function LandingPage() {
             amplitude={1}
             distance={0}
             enableMouseInteraction={true}
-            color={[90, 15, 15]}
+            color={[0.353, 0.059, 0.059]}
           />
         </div>
         
