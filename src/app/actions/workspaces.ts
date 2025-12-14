@@ -221,32 +221,47 @@ export async function getWorkspaceMembers(accessToken: string, workspaceId: stri
     return { error: 'Not a workspace member', data: null }
   }
 
+  // Get workspace members
   const { data: members, error } = await supabase
     .from('workspace_members')
-    .select(`
-      *,
-      profiles:user_id (
-        id,
-        username,
-        email,
-        avatar_url
-      )
-    `)
+    .select('*')
     .eq('workspace_id', workspaceId)
 
   if (error) {
     return { error: error.message, data: null }
   }
 
-  const formattedMembers = members?.map(m => ({
-    id: m.user_id,
-    username: m.profiles?.username || 'Unknown',
-    email: m.profiles?.email || '',
-    role: m.role,
-    joined_at: m.joined_at
-  }))
+  if (!members || members.length === 0) {
+    return { data: [], error: null }
+  }
 
-  return { data: formattedMembers || [], error: null }
+  // Get user profiles for all members
+  const userIds = members.map(m => m.user_id)
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, username, email, avatar_url')
+    .in('id', userIds)
+
+  if (profilesError) {
+    console.error('[getWorkspaceMembers] Error fetching profiles:', profilesError)
+  }
+
+  // Map profiles by id for easy lookup
+  const profilesMap = new Map(profiles?.map(p => [p.id, p]) || [])
+
+  const formattedMembers = members.map(m => {
+    const profile = profilesMap.get(m.user_id)
+    return {
+      id: m.user_id,
+      username: profile?.username || 'Unknown',
+      email: profile?.email || '',
+      avatar_url: profile?.avatar_url || null,
+      role: m.role,
+      joined_at: m.joined_at
+    }
+  })
+
+  return { data: formattedMembers, error: null }
 }
 
 export async function addWorkspaceMember(accessToken: string, workspaceId: string, memberEmail: string) {

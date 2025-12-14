@@ -10,6 +10,7 @@ interface Member {
   id: string;
   username: string;
   email: string;
+  avatar_url?: string | null;
   role: string;
   joined_at: string;
 }
@@ -156,9 +157,17 @@ export default function WorkspaceMembersPage() {
                   className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-dark-red text-white flex items-center justify-center text-xl font-bold">
-                      {member.username[0]?.toUpperCase() || member.email[0]?.toUpperCase()}
-                    </div>
+                    {member.avatar_url ? (
+                      <img
+                        src={member.avatar_url}
+                        alt={member.username}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-dark-red text-white flex items-center justify-center text-xl font-bold">
+                        {member.username[0]?.toUpperCase() || member.email[0]?.toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <p className="font-semibold text-gray-900 dark:text-white">{member.username}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{member.email}</p>
