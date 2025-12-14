@@ -200,3 +200,186 @@ export async function getWorkspace(accessToken: string, workspaceId: string) {
 
   return { data: workspace, error: null }
 }
+
+export async function getWorkspaceMembers(accessToken: string, workspaceId: string) {
+  const supabase = getSupabaseAdmin()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: null }
+  }
+
+  // Verify user is workspace member
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!member) {
+    return { error: 'Not a workspace member', data: null }
+  }
+
+  const { data: members, error } = await supabase
+    .from('workspace_members')
+    .select(`
+      *,
+      profiles:user_id (
+        id,
+        username,
+        email,
+        avatar_url
+      )
+    `)
+    .eq('workspace_id', workspaceId)
+
+  if (error) {
+    return { error: error.message, data: null }
+  }
+
+  const formattedMembers = members?.map(m => ({
+    id: m.user_id,
+    username: m.profiles?.username || 'Unknown',
+    email: m.profiles?.email || '',
+    role: m.role,
+    joined_at: m.joined_at
+  }))
+
+  return { data: formattedMembers || [], error: null }
+}
+
+export async function addWorkspaceMember(accessToken: string, workspaceId: string, memberEmail: string) {
+  const supabase = getSupabaseAdmin()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: null }
+  }
+
+  // Verify user is workspace owner or admin
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
+    return { error: 'Only workspace owners and admins can add members', data: null }
+  }
+
+  // Find user by email
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, username, email')
+    .eq('email', memberEmail)
+    .single()
+
+  if (!profile) {
+    return { error: 'User not found with that email', data: null }
+  }
+
+  // Check if already a member
+  const { data: existing } = await supabase
+    .from('workspace_members')
+    .select('*')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', profile.id)
+    .single()
+
+  if (existing) {
+    return { error: 'User is already a member of this workspace', data: null }
+  }
+
+  // Add member
+  const { data: newMember, error } = await supabase
+    .from('workspace_members')
+    .insert({
+      workspace_id: workspaceId,
+      user_id: profile.id,
+      role: 'member'
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return { error: error.message, data: null }
+  }
+
+  // Add to all public channels
+  const { data: publicChannels } = await supabase
+    .from('channels')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('is_private', false)
+
+  if (publicChannels && publicChannels.length > 0) {
+    const channelMemberInserts = publicChannels.map(channel => ({
+      channel_id: channel.id,
+      user_id: profile.id
+    }))
+
+    await supabase
+      .from('channel_members')
+      .insert(channelMemberInserts)
+  }
+
+  revalidatePath('/workspace')
+  return { 
+    data: {
+      id: profile.id,
+      username: profile.username,
+      email: profile.email,
+      role: 'member'
+    }, 
+    error: null 
+  }
+}
+
+export async function removeWorkspaceMember(accessToken: string, workspaceId: string, memberId: string) {
+  const supabase = getSupabaseAdmin()
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken)
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: null }
+  }
+
+  // Verify user is workspace owner or admin
+  const { data: member } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!member || (member.role !== 'owner' && member.role !== 'admin')) {
+    return { error: 'Only workspace owners and admins can remove members', data: null }
+  }
+
+  // Can't remove owner
+  const { data: targetMember } = await supabase
+    .from('workspace_members')
+    .select('role')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', memberId)
+    .single()
+
+  if (targetMember?.role === 'owner') {
+    return { error: 'Cannot remove workspace owner', data: null }
+  }
+
+  // Remove member
+  const { error } = await supabase
+    .from('workspace_members')
+    .delete()
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', memberId)
+
+  if (error) {
+    return { error: error.message, data: null }
+  }
+
+  revalidatePath('/workspace')
+  return { data: null, error: null }
+}

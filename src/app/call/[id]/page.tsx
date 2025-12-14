@@ -30,6 +30,7 @@ export default function CallPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [emojiReactions, setEmojiReactions] = useState<Array<{
     id: string;
     emoji: string;
@@ -40,6 +41,7 @@ export default function CallPage() {
 
   const webrtcRef = useRef<WebRTCService | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const supabaseChannelRef = useRef<any>(null);
 
@@ -52,30 +54,40 @@ export default function CallPage() {
     };
   }, [workspaceId]);
 
-  // Handle local stream when it's available
+  // Unified video management - handles all camera states
   useEffect(() => {
-    console.log('[Call] useEffect triggered - localStream:', localStream, 'videoRef:', localVideoRef.current);
-    
-    if (localStream && localVideoRef.current) {
-      console.log('[Call] Setting local stream on video element');
-      localVideoRef.current.srcObject = localStream;
+    // Handle local camera video
+    if (localStream && localVideoRef.current && !isCameraOff && !isScreenSharing) {
+      console.log('[Call] Setting up local camera video');
       
-      // Force play
-      const playPromise = localVideoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log('[Call] Video playing successfully!');
-          })
-          .catch(err => {
+      // Check if stream is already set to avoid redundant operations
+      if (localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
+        localVideoRef.current.play().catch(err => {
+          // Ignore AbortError - it just means we're updating the stream
+          if (err.name !== 'AbortError') {
             console.error('[Call] Error playing local video:', err);
-          });
+          }
+        });
       }
-    } else {
-      if (!localStream) console.log('[Call] Waiting for local stream...');
-      if (!localVideoRef.current) console.log('[Call] Video ref not ready yet...');
     }
-  }, [localStream]);
+  }, [localStream, isCameraOff, isScreenSharing]);
+
+  // Handle screen share stream display in separate video element
+  useEffect(() => {
+    if (screenStream && screenVideoRef.current) {
+      console.log('[Call] Setting screen share stream');
+      
+      if (screenVideoRef.current.srcObject !== screenStream) {
+        screenVideoRef.current.srcObject = screenStream;
+        screenVideoRef.current.play().catch(err => {
+          if (err.name !== 'AbortError') {
+            console.error('[Call] Error playing screen share:', err);
+          }
+        });
+      }
+    }
+  }, [screenStream]);
 
   const checkAuthAndInitialize = async () => {
     // Check WebRTC support
@@ -103,12 +115,21 @@ export default function CallPage() {
     try {
       // Check for active call or create new one
       let activeCall = await getActiveCall(token, workspaceId);
+      
+      // Handle errors (including "Not a workspace member")
+      if (activeCall.error) {
+        throw new Error(activeCall.error);
+      }
+      
       let currentCallId: string;
       
       if (activeCall.data) {
         currentCallId = activeCall.data.id;
         setCallId(currentCallId);
-        await joinCall(token, currentCallId);
+        const joinResult = await joinCall(token, currentCallId);
+        if (joinResult.error) {
+          throw new Error(joinResult.error);
+        }
       } else {
         const newCall = await createCall(token, workspaceId);
         if (newCall.error) {
@@ -182,14 +203,18 @@ export default function CallPage() {
         switch (payload.type) {
           case 'user-joined':
             if (payload.participant) {
-              // New user joined - send them an offer
+              // New user joined - add to participants
               setParticipants(prev => {
                 if (prev.find(p => p.id === payload.participant!.id)) return prev;
                 return [...prev, payload.participant!];
               });
 
-              // Only send offer if we're not the new user
-              if (payload.participant.id !== userId) {
+              // Use deterministic rule: only the user with smaller ID creates offer
+              // This prevents both users from creating offers simultaneously
+              const shouldCreateOffer = userId < payload.participant.id;
+              
+              if (shouldCreateOffer) {
+                console.log('[Call] I have smaller ID, creating offer to:', payload.participant.id);
                 await webrtcRef.current.createOffer(payload.participant.id, (signal) => {
                   channel.send({
                     type: 'broadcast',
@@ -197,6 +222,8 @@ export default function CallPage() {
                     payload: signal
                   });
                 });
+              } else {
+                console.log('[Call] Other user has smaller ID, waiting for their offer');
               }
             }
             break;
@@ -286,9 +313,34 @@ export default function CallPage() {
     const result = await getCallParticipants(token, callId);
     if (result.data) {
       setParticipants(result.data);
+      
+      // Create WebRTC connections with existing participants
+      // Use deterministic rule: only create offer if our ID is smaller
+      console.log('[Call] Found', result.data.length, 'existing participants');
+      for (const participant of result.data) {
+        if (participant.id !== userId && webrtcRef.current) {
+          const shouldCreateOffer = userId < participant.id;
+          
+          if (shouldCreateOffer) {
+            console.log('[Call] Creating offer for existing participant:', participant.id);
+            await webrtcRef.current.createOffer(participant.id, (signal) => {
+              channel.send({
+                type: 'broadcast',
+                event: 'signal',
+                payload: signal
+              });
+            });
+          } else {
+            console.log('[Call] Waiting for offer from existing participant:', participant.id);
+          }
+        }
+      }
     }
 
-    // Announce our joining
+    // Get current user profile for announcement
+    const currentUser = result.data?.find(p => p.id === userId);
+    
+    // Announce our joining with actual profile data
     channel.send({
       type: 'broadcast',
       event: 'signal',
@@ -297,8 +349,8 @@ export default function CallPage() {
         from: userId,
         participant: {
           id: userId,
-          name: 'You',
-          avatar: 'YO',
+          name: currentUser?.name || 'User',
+          avatar: currentUser?.avatar || 'U',
           isMuted: false,
           isCameraOff: false
         }
@@ -369,12 +421,25 @@ export default function CallPage() {
 
     try {
       if (isScreenSharing) {
+        // Stop screen sharing
         webrtcRef.current.stopScreenShare();
         setIsScreenSharing(false);
+        setScreenStream(null);
         toast.success('Stopped screen sharing');
       } else {
-        await webrtcRef.current.startScreenShare();
+        // Start screen sharing
+        const stream = await webrtcRef.current.startScreenShare();
         setIsScreenSharing(true);
+        setScreenStream(stream);
+        
+        // Handle when user stops sharing via browser UI
+        stream.getVideoTracks()[0].onended = () => {
+          setIsScreenSharing(false);
+          setScreenStream(null);
+          webrtcRef.current?.stopScreenShare();
+          toast.success('Screen sharing stopped');
+        };
+        
         toast.success('Started screen sharing');
       }
     } catch (error: any) {
@@ -441,6 +506,12 @@ export default function CallPage() {
       supabaseChannelRef.current = null;
     }
 
+    // Cleanup screen stream
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      setScreenStream(null);
+    }
+
     // Cleanup video refs
     videoRefs.current.clear();
   };
@@ -496,6 +567,28 @@ export default function CallPage() {
       {/* Video Grid */}
       <div className="flex-1 p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
+          {/* Screen Share (if active) - Shows first */}
+          {isScreenSharing && screenStream && (
+            <div className="relative bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center">
+              <video
+                ref={screenVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-contain"
+              />
+              <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/70 px-3 py-2 rounded">
+                <span className="text-white text-sm font-medium">Your Screen</span>
+              </div>
+              <div className="absolute top-4 right-4 bg-blue-500 text-white px-3 py-1 rounded text-xs font-semibold flex items-center gap-1">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clipRule="evenodd" />
+                </svg>
+                SHARING
+              </div>
+            </div>
+          )}
+
           {/* Local Video (You) */}
           <div className="relative bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center">
             {!localStream ? (
