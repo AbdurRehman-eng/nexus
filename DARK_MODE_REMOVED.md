@@ -138,3 +138,4 @@ The app now uses this consistent palette:
 ---
 
 ✅ **Dark mode successfully removed! App now uses white background only.** 🌞
+
