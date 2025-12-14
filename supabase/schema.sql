@@ -7,9 +7,30 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   username TEXT NOT NULL,
   email TEXT NOT NULL,
   avatar_url TEXT,
+  display_name TEXT,
+  bio TEXT,
+  phone TEXT,
+  job_title TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Add additional profile columns if they don't exist (for existing databases)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'display_name') THEN
+    ALTER TABLE public.profiles ADD COLUMN display_name TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'bio') THEN
+    ALTER TABLE public.profiles ADD COLUMN bio TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'phone') THEN
+    ALTER TABLE public.profiles ADD COLUMN phone TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'job_title') THEN
+    ALTER TABLE public.profiles ADD COLUMN job_title TEXT;
+  END IF;
+END $$;
 
 -- Workspaces table
 CREATE TABLE IF NOT EXISTS public.workspaces (

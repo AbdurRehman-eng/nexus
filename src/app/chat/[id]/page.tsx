@@ -571,8 +571,25 @@ export default function ChatPage() {
             <div className="p-3 sm:p-6 space-y-4">
               {messages.filter(m => !m.threadId).map((message) => (
               <div key={message.id} className="flex gap-2 sm:gap-3 group relative">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded bg-dark-red text-white flex items-center justify-center font-semibold flex-shrink-0 text-sm sm:text-base">
-                  {message.avatar}
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-dark-red text-white flex items-center justify-center font-semibold flex-shrink-0 text-sm sm:text-base overflow-hidden">
+                  {message.avatar && (message.avatar.startsWith('http://') || message.avatar.startsWith('https://')) ? (
+                    <img
+                      src={message.avatar}
+                      alt={message.user}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Fallback to initials if image fails to load
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent) {
+                          parent.textContent = message.user?.[0]?.toUpperCase() || 'U';
+                        }
+                      }}
+                    />
+                  ) : (
+                    message.avatar || message.user?.[0]?.toUpperCase() || 'U'
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2 mb-1">
@@ -774,8 +791,25 @@ export default function ChatPage() {
             {threadMessages.map((msg, idx) => (
               <div key={msg.id} className={idx === 0 ? 'pb-4 border-b border-gray-300' : ''}>
                 <div className="flex gap-3">
-                  <div className="w-8 h-8 rounded bg-dark-red text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
-                    {msg.avatar}
+                  <div className="w-8 h-8 rounded-full bg-dark-red text-white flex items-center justify-center text-sm font-semibold flex-shrink-0 overflow-hidden">
+                    {msg.avatar && (msg.avatar.startsWith('http://') || msg.avatar.startsWith('https://')) ? (
+                      <img
+                        src={msg.avatar}
+                        alt={msg.user}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initials if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.textContent = msg.user?.[0]?.toUpperCase() || 'U';
+                          }
+                        }}
+                      />
+                    ) : (
+                      msg.avatar || msg.user?.[0]?.toUpperCase() || 'U'
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2 mb-1">

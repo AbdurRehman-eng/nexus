@@ -77,7 +77,7 @@ export default function Homepage() {
             NEXUS <span className="text-xs sm:text-sm font-normal text-gray-600">by AKD</span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">
-            <button className="text-xs sm:text-sm text-gray-700 hover:text-dark-red px-2 sm:px-0">Profile</button>
+            <Link href="/profile" className="text-xs sm:text-sm text-gray-700 hover:text-dark-red px-2 sm:px-0">Profile</Link>
             <button onClick={handleLogout} className="text-xs sm:text-sm text-gray-700 hover:text-dark-red px-2 sm:px-0">Logout</button>
           </div>
         </div>
