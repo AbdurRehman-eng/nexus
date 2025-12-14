@@ -1,73 +1,49 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 /**
- * OAuth callback handler
- * Handles the redirect from OAuth providers (e.g., Google)
- * Exchanges the authorization code for a session and sets cookies
+ * OAuth callback handler (Server-side)
+ * This route primarily serves the client-side handler
+ * The actual token processing happens client-side to handle both PKCE and implicit flows
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get('code')
-  const error = requestUrl.searchParams.get('error')
-  const errorDescription = requestUrl.searchParams.get('error_description')
   const origin = requestUrl.origin
 
-  console.log('[OAuth Callback] Processing OAuth callback', { 
-    hasCode: !!code, 
-    hasError: !!error 
-  })
+  console.log('[OAuth Callback Route] Serving client-side callback handler')
 
-  // Handle OAuth errors
-  if (error) {
-    console.error('[OAuth Callback] OAuth error:', { error, errorDescription })
-    return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(errorDescription || error)}`
-    )
-  }
-
-  if (code) {
-    try {
-      // Create Supabase client
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-
-      // Exchange code for session
-      const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-      
-      if (exchangeError) {
-        console.error('[OAuth Callback] Failed to exchange code:', exchangeError.message)
-        return NextResponse.redirect(
-          `${origin}/login?error=${encodeURIComponent('Failed to complete sign in. Please try again.')}`
-        )
-      }
-
-      if (!data.session) {
-        console.error('[OAuth Callback] No session returned after code exchange')
-        return NextResponse.redirect(
-          `${origin}/login?error=${encodeURIComponent('Failed to create session. Please try again.')}`
-        )
-      }
-
-      console.log('[OAuth Callback] ✅ Successfully authenticated user:', {
-        userId: data.user.id,
-        email: data.user.email,
-        provider: data.user.app_metadata.provider
-      })
-
-      // Redirect to homepage - the browser will handle localStorage/cookie persistence
-      return NextResponse.redirect(`${origin}/homepage`)
-    } catch (err) {
-      console.error('[OAuth Callback] Unexpected error:', err)
-      return NextResponse.redirect(
-        `${origin}/login?error=${encodeURIComponent('An unexpected error occurred. Please try again.')}`
-      )
+  // Return a simple HTML page that includes the client component
+  // This allows the client to access both query params and hash fragments
+  return new NextResponse(
+    `<!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Completing Sign In...</title>
+        <script>
+          // Immediately redirect to the client page with full URL (including hash)
+          window.location.href = '${origin}/auth/callback/complete' + window.location.search + window.location.hash;
+        </script>
+      </head>
+      <body>
+        <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif;">
+          <div style="text-align: center;">
+            <div style="display: inline-block; width: 48px; height: 48px; border: 4px solid #f3f4f6; border-top-color: #5A0F0F; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px;"></div>
+            <p style="color: #6b7280; font-size: 18px;">Completing sign in...</p>
+          </div>
+        </div>
+        <style>
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        </style>
+      </body>
+    </html>`,
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html',
+      },
     }
-  }
-
-  // No code and no error - unexpected state
-  console.warn('[OAuth Callback] No code or error provided')
-  return NextResponse.redirect(`${origin}/login`)
+  )
 }

@@ -103,6 +103,14 @@ Once configured, your users can:
 
 See the comprehensive guide: **`GOOGLE_OAUTH_SETUP.md`**
 
+## 🔧 Recent Fix: OAuth Callback Handling
+
+**Issue Fixed**: Users were being redirected with tokens in URL hash instead of to `/homepage`.
+
+**Solution**: Implemented dual-flow client handler that works with both PKCE and implicit OAuth flows.
+
+See **`OAUTH_CALLBACK_FIX.md`** for technical details.
+
 ## 🎉 That's It!
 
-No code changes needed - just configure Google and Supabase, and you're ready to go!
+The code is fully implemented and production-ready. Just configure Google and Supabase, deploy, and users can sign in with Google!

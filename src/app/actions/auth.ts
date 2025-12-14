@@ -114,6 +114,7 @@ export async function signOut(accessToken: string) {
 
 /**
  * Sign in with Google OAuth
+ * Uses PKCE flow for better security
  */
 export async function signInWithGoogle() {
   const supabase = getSupabaseAdmin()
@@ -126,6 +127,7 @@ export async function signInWithGoogle() {
         access_type: 'offline',
         prompt: 'consent',
       },
+      skipBrowserRedirect: false,
     },
   })
 
