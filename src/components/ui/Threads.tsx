@@ -15,7 +15,7 @@ export default function Threads({
   distance = 0,
   enableMouseInteraction = true,
   className = '',
-  color = [107, 114, 128], // Default dark gray (gray-600)
+  color = [90, 15, 15], // Default dark red (#5A0F0F)
 }: ThreadsProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();

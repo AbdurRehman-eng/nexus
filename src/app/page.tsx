@@ -93,7 +93,7 @@ export default function LandingPage() {
             amplitude={1}
             distance={0}
             enableMouseInteraction={true}
-            color={[107, 114, 128]}
+            color={[90, 15, 15]}
           />
         </div>
         
