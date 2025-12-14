@@ -110,7 +110,7 @@ export default function CreateWorkspace() {
       </div>
 
       {/* Right Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-white">
         <div className="w-full max-w-md">
           {step === 1 ? (
             <form onSubmit={handleStep1Next} className="space-y-6">
@@ -165,6 +165,7 @@ export default function CreateWorkspace() {
             </form>
           ) : (
             <form onSubmit={handleCreate} className="space-y-6">
+              <h2 className="lg:hidden text-2xl font-bold text-dark-red mb-4">Add Team Members</h2>
               {error && (
                 <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-input text-sm">
                   {error}
@@ -186,7 +187,7 @@ export default function CreateWorkspace() {
                 <label htmlFor="coworkerEmail" className="block text-sm font-medium text-gray-700 mb-2">
                   Add Coworker by Email
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     id="coworkerEmail"
                     type="email"
@@ -198,7 +199,7 @@ export default function CreateWorkspace() {
                         handleAddCoworker();
                       }
                     }}
-                    className="input-field"
+                    className="input-field flex-1"
                     placeholder="coworker@example.com"
                     disabled={loading}
                   />
@@ -206,7 +207,7 @@ export default function CreateWorkspace() {
                     type="button"
                     onClick={handleAddCoworker}
                     disabled={loading || !coworkerEmail.trim()}
-                    className="px-4 py-2 bg-dark-red text-white rounded-button font-semibold hover:bg-maroon disabled:opacity-50"
+                    className="px-4 py-2 bg-dark-red text-white rounded-button font-semibold hover:bg-maroon disabled:opacity-50 w-full sm:w-auto"
                   >
                     Add
                   </button>
@@ -231,16 +232,16 @@ export default function CreateWorkspace() {
                 </div>
               )}
 
-              <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="btn-secondary flex-1"
+                  className="btn-secondary flex-1 w-full"
                   disabled={loading}
                 >
                   Back
                 </button>
-                <button type="submit" className="btn-primary flex-1" disabled={loading}>
+                <button type="submit" className="btn-primary flex-1 w-full" disabled={loading}>
                   {loading ? 'Creating...' : 'Create Workspace'}
                 </button>
               </div>

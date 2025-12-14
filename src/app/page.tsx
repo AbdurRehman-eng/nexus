@@ -7,21 +7,21 @@ export default function LandingPage() {
       <Navbar />
       
       {/* Hero Section */}
-      <main className="max-w-7xl mx-auto px-8 py-32 text-center">
-        <h1 className="text-6xl font-bold text-dark-red mb-6">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-20 md:py-32 text-center">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-dark-red mb-4 sm:mb-6 px-4">
           WORK SMARTER, NOT HARDER
         </h1>
         
-        <p className="text-xl text-gray-700 mb-12 max-w-2xl mx-auto">
+        <p className="text-base sm:text-lg md:text-xl text-gray-700 mb-8 sm:mb-12 max-w-2xl mx-auto px-4">
           Chat, share and work together — all on one AI-powered space.
         </p>
         
-        <Link href="/register" className="btn-primary text-lg inline-block">
+        <Link href="/register" className="btn-primary text-base sm:text-lg inline-block">
           Get Started
         </Link>
 
         {/* Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-24">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mt-12 sm:mt-16 md:mt-24">
           <div className="card text-left">
             <div className="w-12 h-12 bg-dark-red rounded-lg mb-4 flex items-center justify-center">
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

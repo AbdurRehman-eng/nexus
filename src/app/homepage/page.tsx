@@ -71,21 +71,21 @@ export default function Homepage() {
 
   return (
     <div className="min-h-screen bg-light-gray">
-      <nav className="bg-white border-b border-gray-border px-8 py-4">
+      <nav className="bg-white border-b border-gray-border px-4 sm:px-6 md:px-8 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-dark-red">
-            NEXUS <span className="text-sm font-normal text-gray-600">by AKD</span>
+          <Link href="/" className="text-xl sm:text-2xl font-bold text-dark-red">
+            NEXUS <span className="text-xs sm:text-sm font-normal text-gray-600">by AKD</span>
           </Link>
-          <div className="flex items-center gap-4">
-            <button className="text-sm text-gray-700 hover:text-dark-red">Profile</button>
-            <button onClick={handleLogout} className="text-sm text-gray-700 hover:text-dark-red">Logout</button>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <button className="text-xs sm:text-sm text-gray-700 hover:text-dark-red px-2 sm:px-0">Profile</button>
+            <button onClick={handleLogout} className="text-xs sm:text-sm text-gray-700 hover:text-dark-red px-2 sm:px-0">Logout</button>
           </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-8 py-12">
-        <h1 className="text-4xl font-bold text-dark-red mb-2">Hi! Welcome Back</h1>
-        <p className="text-gray-600 mb-12">Select a workspace or create a new one to get started.</p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-6 sm:py-8 md:py-12">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-dark-red mb-2">Hi! Welcome Back</h1>
+        <p className="text-sm sm:text-base text-gray-600 mb-6 sm:mb-8 md:mb-12">Select a workspace or create a new one to get started.</p>
 
         {loading ? (
           <div className="flex items-center justify-center py-24">
@@ -97,14 +97,14 @@ export default function Homepage() {
           </div>
         ) : workspaces.length === 0 ? (
           // Empty State
-          <div className="flex flex-col items-center justify-center py-24">
-            <div className="w-48 h-48 mb-8 flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center py-12 sm:py-16 md:py-24 px-4">
+            <div className="w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 mb-6 sm:mb-8 flex items-center justify-center">
               <svg className="w-full h-full text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
               </svg>
             </div>
-            <p className="text-xl text-gray-600 mb-8">There is no workspace here. Create your own workspace.</p>
-            <Link href="/workspace/create" className="btn-primary">
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 sm:mb-8 text-center">There is no workspace here. Create your own workspace.</p>
+            <Link href="/workspace/create" className="btn-primary text-sm sm:text-base">
               + Create New Workspace
             </Link>
           </div>
@@ -125,18 +125,18 @@ export default function Homepage() {
                   href={`/chat/${workspace.id}`}
                   className="card hover:shadow-lg transition-shadow cursor-pointer"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-16 h-16 bg-dark-red rounded-lg flex items-center justify-center text-white text-2xl font-bold flex-shrink-0">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-dark-red rounded-lg flex items-center justify-center text-white text-lg sm:text-xl md:text-2xl font-bold flex-shrink-0">
                       {workspace.name.charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
                         {workspace.name}
                       </h3>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs sm:text-sm text-gray-600 truncate">
                         {workspace.owner} • {workspace.designation}
                       </p>
-                      <p className="text-sm text-gray-500 mt-2">
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
                         {workspace.channelsCount} {workspace.channelsCount === 1 ? 'channel' : 'channels'}
                       </p>
                     </div>
