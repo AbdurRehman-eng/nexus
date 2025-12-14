@@ -12,6 +12,7 @@ import EmojiPicker from '@/components/EmojiPicker';
 import MessageActions from '@/components/MessageActions';
 import FileUpload from '@/components/FileUpload';
 import MessageAttachments from '@/components/MessageAttachments';
+import { MessageSkeletonList } from '@/components/MessageSkeleton';
 import toast from 'react-hot-toast';
 
 interface Attachment {
@@ -56,6 +57,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [loading, setLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [accessToken, setAccessToken] = useState('');
@@ -150,11 +152,13 @@ export default function ChatPage() {
   const loadMessages = async (channelId: string) => {
     if (!accessToken) return;
     
-    setLoading(true);
+    setMessagesLoading(true);
+    setError('');
     const result = await getMessages(accessToken, channelId);
     
     if (result.error) {
       setError(result.error);
+      setMessagesLoading(false);
     } else {
       const formattedMessages = await Promise.all((result.data || []).map(async (msg) => {
         const reactionsResult = await getMessageReactions(accessToken, msg.id);
@@ -175,8 +179,8 @@ export default function ChatPage() {
         };
       }));
       setMessages(formattedMessages);
+      setMessagesLoading(false);
     }
-    setLoading(false);
   };
 
   const setupRealtimeSubscription = (channelId: string) => {
@@ -550,22 +554,21 @@ export default function ChatPage() {
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 bg-chat-bg">
+        <div className="flex-1 overflow-y-auto bg-chat-bg">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-input text-sm">
+            <div className="m-3 sm:m-6 p-3 bg-red-50 border border-red-200 text-red-700 rounded-input text-sm">
               {error}
             </div>
           )}
-          {loading && messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-gray-500">Loading messages...</div>
-            </div>
-          ) : messages.length === 0 ? (
+          {messagesLoading ? (
+            <MessageSkeletonList count={5} />
+          ) : messages.length === 0 && !messagesLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-gray-500 text-center px-4">No messages yet. Start the conversation!</div>
             </div>
           ) : (
-            messages.filter(m => !m.threadId).map((message) => (
+            <div className="p-3 sm:p-6 space-y-4">
+              {messages.filter(m => !m.threadId).map((message) => (
               <div key={message.id} className="flex gap-2 sm:gap-3 group relative">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded bg-dark-red text-white flex items-center justify-center font-semibold flex-shrink-0 text-sm sm:text-base">
                   {message.avatar}
@@ -683,7 +686,8 @@ export default function ChatPage() {
                   </div>
                 )}
               </div>
-            ))
+            ))}
+            </div>
           )}
           <div ref={messagesEndRef} />
         </div>
