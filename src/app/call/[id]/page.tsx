@@ -29,6 +29,14 @@ export default function CallPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [emojiReactions, setEmojiReactions] = useState<Array<{
+    id: string;
+    emoji: string;
+    userName: string;
+    x: number;
+    y: number;
+  }>>([]);
 
   const webrtcRef = useRef<WebRTCService | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -43,6 +51,31 @@ export default function CallPage() {
       cleanup();
     };
   }, [workspaceId]);
+
+  // Handle local stream when it's available
+  useEffect(() => {
+    console.log('[Call] useEffect triggered - localStream:', localStream, 'videoRef:', localVideoRef.current);
+    
+    if (localStream && localVideoRef.current) {
+      console.log('[Call] Setting local stream on video element');
+      localVideoRef.current.srcObject = localStream;
+      
+      // Force play
+      const playPromise = localVideoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('[Call] Video playing successfully!');
+          })
+          .catch(err => {
+            console.error('[Call] Error playing local video:', err);
+          });
+      }
+    } else {
+      if (!localStream) console.log('[Call] Waiting for local stream...');
+      if (!localVideoRef.current) console.log('[Call] Video ref not ready yet...');
+    }
+  }, [localStream]);
 
   const checkAuthAndInitialize = async () => {
     // Check WebRTC support
@@ -70,16 +103,19 @@ export default function CallPage() {
     try {
       // Check for active call or create new one
       let activeCall = await getActiveCall(token, workspaceId);
+      let currentCallId: string;
       
       if (activeCall.data) {
-        setCallId(activeCall.data.id);
-        await joinCall(token, activeCall.data.id);
+        currentCallId = activeCall.data.id;
+        setCallId(currentCallId);
+        await joinCall(token, currentCallId);
       } else {
         const newCall = await createCall(token, workspaceId);
         if (newCall.error) {
           throw new Error(newCall.error);
         }
-        setCallId(newCall.data!.id);
+        currentCallId = newCall.data!.id;
+        setCallId(currentCallId);
       }
 
       // Initialize WebRTC
@@ -87,17 +123,21 @@ export default function CallPage() {
       webrtcRef.current = webrtc;
 
       // Initialize local media
-      const localStream = await webrtc.initializeLocalMedia();
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = localStream;
-      }
-
+      const stream = await webrtc.initializeLocalMedia();
+      console.log('[Call] Local stream obtained:', stream);
+      console.log('[Call] Video tracks:', stream.getVideoTracks());
+      console.log('[Call] Audio tracks:', stream.getAudioTracks());
+      
       // Setup WebRTC callbacks
       webrtc.onTrack((participantId, stream) => {
         console.log('[Call] Received stream from:', participantId);
         const videoElement = videoRefs.current.get(participantId);
         if (videoElement) {
           videoElement.srcObject = stream;
+          // Ensure remote video plays
+          videoElement.play().catch(error => {
+            console.error('[Call] Error playing remote video:', error);
+          });
         }
       });
 
@@ -107,9 +147,13 @@ export default function CallPage() {
       });
 
       // Setup Supabase Realtime for signaling
-      await setupRealtimeSignaling(activeCall.data?.id || newCall.data!.id, token, userId);
+      await setupRealtimeSignaling(currentCallId, token, userId);
 
       setLoading(false);
+      
+      // Set stream after loading is false so video element is rendered
+      setLocalStream(stream);
+      
       toast.success('Joined call successfully!');
     } catch (err: any) {
       console.error('[Call] Error initializing:', err);
@@ -193,6 +237,28 @@ export default function CallPage() {
             setParticipants(prev => prev.filter(p => p.id !== payload.from));
             if (webrtcRef.current) {
               webrtcRef.current.closePeerConnection(payload.from);
+            }
+            break;
+
+          case 'emoji-reaction':
+            if (payload.emoji && payload.userName) {
+              // Add emoji reaction to display
+              const reactionId = `${Date.now()}-${Math.random()}`;
+              const randomX = Math.random() * 80 + 10; // 10-90% from left
+              const randomY = Math.random() * 20 + 40; // 40-60% from top
+              
+              setEmojiReactions(prev => [...prev, {
+                id: reactionId,
+                emoji: payload.emoji!,
+                userName: payload.userName!,
+                x: randomX,
+                y: randomY
+              }]);
+
+              // Remove after 3 seconds
+              setTimeout(() => {
+                setEmojiReactions(prev => prev.filter(r => r.id !== reactionId));
+              }, 3000);
             }
             break;
         }
@@ -316,6 +382,44 @@ export default function CallPage() {
     }
   };
 
+  const handleSendEmoji = (emoji: string) => {
+    if (!supabaseChannelRef.current || !currentUserId) return;
+
+    // Get participant name
+    const currentParticipant = participants.find(p => p.id === currentUserId);
+    const userName = currentParticipant?.name || 'You';
+
+    // Broadcast emoji to all participants
+    supabaseChannelRef.current.send({
+      type: 'broadcast',
+      event: 'signal',
+      payload: {
+        type: 'emoji-reaction',
+        from: currentUserId,
+        emoji: emoji,
+        userName: userName
+      }
+    });
+
+    // Show emoji locally
+    const reactionId = `${Date.now()}-${Math.random()}`;
+    const randomX = Math.random() * 80 + 10;
+    const randomY = Math.random() * 20 + 40;
+    
+    setEmojiReactions(prev => [...prev, {
+      id: reactionId,
+      emoji: emoji,
+      userName: userName,
+      x: randomX,
+      y: randomY
+    }]);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+      setEmojiReactions(prev => prev.filter(r => r.id !== reactionId));
+    }, 3000);
+  };
+
   const handleEndCall = async () => {
     if (callId && accessToken) {
       await leaveCall(accessToken, callId);
@@ -368,13 +472,35 @@ export default function CallPage() {
   }
 
   return (
-    <div className="h-screen bg-black flex flex-col">
+    <div className="h-screen bg-black flex flex-col relative">
+      {/* Emoji Reactions Overlay */}
+      {emojiReactions.map((reaction) => (
+        <div
+          key={reaction.id}
+          className="absolute pointer-events-none z-50 animate-float-up"
+          style={{
+            left: `${reaction.x}%`,
+            top: `${reaction.y}%`,
+            animation: 'floatUp 3s ease-out forwards'
+          }}
+        >
+          <div className="flex flex-col items-center">
+            <span className="text-6xl mb-2">{reaction.emoji}</span>
+            <span className="text-white text-sm bg-black/70 px-2 py-1 rounded">
+              {reaction.userName}
+            </span>
+          </div>
+        </div>
+      ))}
+
       {/* Video Grid */}
       <div className="flex-1 p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 h-full">
           {/* Local Video (You) */}
           <div className="relative bg-gray-900 rounded-lg overflow-hidden flex items-center justify-center">
-            {isCameraOff ? (
+            {!localStream ? (
+              <div className="text-white">Loading camera...</div>
+            ) : isCameraOff ? (
               <div className="w-24 h-24 rounded-full bg-dark-red text-white flex items-center justify-center text-3xl font-bold">
                 YO
               </div>
@@ -384,7 +510,7 @@ export default function CallPage() {
                 autoPlay
                 playsInline
                 muted
-                className="w-full h-full object-cover mirror"
+                className="w-full h-full object-cover"
                 style={{ transform: 'scaleX(-1)' }}
               />
             )}
@@ -414,11 +540,23 @@ export default function CallPage() {
               ) : (
                 <video
                   ref={(el) => {
-                    if (el) videoRefs.current.set(participant.id, el);
+                    if (el) {
+                      videoRefs.current.set(participant.id, el);
+                      // Ensure video plays when element is created
+                      if (el.srcObject) {
+                        el.play().catch(err => console.error('[Call] Error playing remote video:', err));
+                      }
+                    }
                   }}
                   autoPlay
                   playsInline
                   className="w-full h-full object-cover"
+                  onLoadedMetadata={(e) => {
+                    console.log('[Call] Remote video metadata loaded for:', participant.id);
+                    (e.target as HTMLVideoElement).play().catch(err => 
+                      console.error('[Call] Error playing remote video:', err)
+                    );
+                  }}
                 />
               )}
               <div className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/70 px-3 py-2 rounded">
@@ -509,8 +647,9 @@ export default function CallPage() {
           {emojis.map((emoji, idx) => (
             <button
               key={idx}
-              className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-xl transition-colors"
-              title="Send emoji"
+              onClick={() => handleSendEmoji(emoji)}
+              className="w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-xl transition-colors hover:scale-110 active:scale-95"
+              title="Send emoji reaction"
             >
               {emoji}
             </button>

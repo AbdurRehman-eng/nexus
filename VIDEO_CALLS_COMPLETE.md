@@ -39,6 +39,13 @@ Full WebRTC video calling functionality has been implemented! Users can now make
 - ✅ ICE candidate trickling
 - ✅ State synchronization
 
+### 6. **Live Emoji Reactions**
+- ✅ Send emoji reactions during calls
+- ✅ Broadcast to all participants
+- ✅ Animated floating emojis
+- ✅ Shows sender name
+- ✅ Auto-fades after 3 seconds
+
 ---
 
 ## 🔧 Setup Instructions
@@ -174,7 +181,7 @@ Using free Google STUN servers for NAT traversal:
 - **Mute/Unmute:** Click microphone button
 - **Camera On/Off:** Click camera button
 - **Share Screen:** Click screen share button
-- **React:** Click emoji buttons
+- **React:** Click emoji buttons (animated reactions appear on everyone's screen)
 - **Leave:** Click red end call button
 
 ### Leaving Call

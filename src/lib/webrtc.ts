@@ -11,7 +11,7 @@ export interface Participant {
 }
 
 export interface SignalData {
-  type: 'offer' | 'answer' | 'ice-candidate' | 'user-joined' | 'user-left' | 'media-state';
+  type: 'offer' | 'answer' | 'ice-candidate' | 'user-joined' | 'user-left' | 'media-state' | 'emoji-reaction';
   from: string;
   to?: string;
   offer?: RTCSessionDescriptionInit;
@@ -20,6 +20,8 @@ export interface SignalData {
   participant?: Participant;
   isMuted?: boolean;
   isCameraOff?: boolean;
+  emoji?: string;
+  userName?: string;
 }
 
 // STUN servers for NAT traversal (free Google STUN servers)
