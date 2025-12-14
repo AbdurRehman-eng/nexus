@@ -98,7 +98,7 @@ export default function LandingPage() {
         </div>
         
         {/* Content Overlay */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-8 py-12 sm:py-16 md:py-20 text-center" style={{ minHeight: '600px' }}>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pt-[20vh] pb-12 sm:pb-16 md:pb-20 text-center" style={{ minHeight: '600px' }}>
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-dark-red mb-6 sm:mb-8 px-4 leading-tight">
             WORK SMARTER,<br />NOT HARDER
           </h1>
