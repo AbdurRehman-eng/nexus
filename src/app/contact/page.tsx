@@ -70,7 +70,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg mb-1">Email</h3>
-                  <p className="text-gray-600">support@nexus-akd.com</p>
+                  <p className="text-gray-600">shafiqueabdurrehman1@gmail.com</p>
                 </div>
               </div>
 
@@ -84,8 +84,8 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-semibold text-lg mb-1">Office</h3>
                   <p className="text-gray-600">
-                    123 Innovation Drive<br />
-                    Tech City, TC 12345
+                    NUST<br />
+                    Islamabad, Pakistan
                   </p>
                 </div>
               </div>
