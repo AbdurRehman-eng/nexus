@@ -92,9 +92,9 @@ export class WebRTCService {
   async startScreenShare(): Promise<MediaStream> {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: 'always' },
+        video: true,
         audio: false
-      });
+      } as DisplayMediaStreamOptions);
       this.screenStream = stream;
 
       const videoTrack = stream.getVideoTracks()[0];
@@ -315,8 +315,10 @@ export class WebRTCService {
 // Utility: Check if browser supports WebRTC
 export function isWebRTCSupported(): boolean {
   return !!(
+    typeof navigator !== 'undefined' &&
     navigator.mediaDevices &&
-    navigator.mediaDevices.getUserMedia &&
+    typeof navigator.mediaDevices.getUserMedia === 'function' &&
+    typeof window !== 'undefined' &&
     window.RTCPeerConnection
   );
 }

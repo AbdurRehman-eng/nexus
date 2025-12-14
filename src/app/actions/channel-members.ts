@@ -74,13 +74,16 @@ export async function getChannelMembers(accessToken: string, channelId: string) 
   }
 
   // Format the response
-  const formattedMembers = members?.map(member => ({
-    userId: member.user_id,
-    username: member.profiles?.username || 'Unknown',
-    email: member.profiles?.email || '',
-    avatarUrl: member.profiles?.avatar_url || null,
-    joinedAt: member.joined_at,
-  })) || []
+  const formattedMembers = members?.map((member: any) => {
+    const profile = member.profiles || {}
+    return {
+      userId: member.user_id,
+      username: profile.username || 'Unknown',
+      email: profile.email || '',
+      avatarUrl: profile.avatar_url || null,
+      joinedAt: member.joined_at,
+    }
+  }) || []
 
   return { data: formattedMembers, error: null }
 }

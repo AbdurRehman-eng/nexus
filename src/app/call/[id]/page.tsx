@@ -22,7 +22,7 @@ function EmojiReactions() {
   const room = useRoomContext();
 
   // Listen for emoji reactions via data channel
-  const { send } = useDataChannel('emoji-reactions', (message) => {
+  const handleEmojiMessage = useCallback((message: any) => {
     try {
       const payload = JSON.parse(new TextDecoder().decode(message.payload));
       if (payload.type === 'emoji') {
@@ -43,7 +43,9 @@ function EmojiReactions() {
     } catch (error) {
       console.error('[Emoji] Error processing reaction:', error);
     }
-  });
+  }, []);
+
+  const { send } = useDataChannel('emoji-reactions', handleEmojiMessage);
 
   const sendEmoji = useCallback((emoji: string) => {
     const payload = JSON.stringify({
