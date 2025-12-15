@@ -254,6 +254,7 @@ export default function ChatPage() {
     setMessages([]);
     setReplyToMessage(null);
     setShowThreadView(false);
+    setViewMode('channels');
     setShowSidebar(false); // Close sidebar on mobile after selection
   };
 
@@ -526,12 +527,6 @@ export default function ChatPage() {
     loadSavedItems();
   };
 
-  const handleChannelClick = (channel: Channel) => {
-    setActiveChannelId(channel.id);
-    setActiveChannelName(`#${channel.name}`);
-    setViewMode('channels');
-    setShowSidebar(false);
-  };
 
   return (
     <div className="h-screen flex overflow-hidden">
