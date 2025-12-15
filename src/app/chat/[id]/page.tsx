@@ -84,8 +84,15 @@ export default function ChatPage() {
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [showThreadView, setShowThreadView] = useState(false);
+  
+  // Sidebar views
+  const [viewMode, setViewMode] = useState<'channels' | 'drafts' | 'saved'>('channels');
+  const [drafts, setDrafts] = useState<any[]>([]);
+  const [savedItems, setSavedItems] = useState<any[]>([]);
+  const [savedMessageIds, setSavedMessageIds] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const draftSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     checkAuthAndLoad();
