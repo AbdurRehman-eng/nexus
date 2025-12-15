@@ -138,6 +138,45 @@ export async function joinCall(accessToken: string, callId: string) {
   return { data, error: null }
 }
 
+// Notify workspace by posting a system-like message in #general
+export async function notifyCallStart(accessToken: string, workspaceId: string, callUrl: string) {
+  const supabase = getSupabaseAdmin()
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken)
+  if (userError || !user) {
+    return { error: 'Not authenticated', data: null }
+  }
+
+  // Find #general channel for the workspace
+  const { data: channel } = await supabase
+    .from('channels')
+    .select('id')
+    .eq('workspace_id', workspaceId)
+    .eq('name', 'general')
+    .maybeSingle()
+
+  if (!channel) {
+    return { error: 'General channel not found', data: null }
+  }
+
+  // Post a message so all members see the call notification
+  const content = `${user.email || 'Someone'} started a call. Join here: ${callUrl}`
+
+  const { error: msgError } = await supabase
+    .from('messages')
+    .insert({
+      channel_id: channel.id,
+      sender_id: user.id,
+      content,
+    })
+
+  if (msgError) {
+    return { error: msgError.message, data: null }
+  }
+
+  return { data: true, error: null }
+}
+
 export async function leaveCall(accessToken: string, callId: string) {
   const supabase = getSupabaseAdmin()
 

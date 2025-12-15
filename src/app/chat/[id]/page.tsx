@@ -9,6 +9,7 @@ import { getWorkspace } from '@/app/actions/workspaces';
 import { getMessageAttachments, deleteAttachment } from '@/app/actions/files';
 import { getDrafts, saveDraft, deleteDraft } from '@/app/actions/drafts';
 import { getSavedItems, saveMessage, unsaveMessage, isMessageSaved } from '@/app/actions/saved-items';
+import { notifyCallStart } from '@/app/actions/calls';
 import { createClient } from '@/lib/supabase/client';
 import EmojiPicker from '@/components/EmojiPicker';
 import MessageActions from '@/components/MessageActions';
@@ -534,6 +535,19 @@ export default function ChatPage() {
     loadSavedItems();
   };
 
+  const handleStartCall = async () => {
+    if (!accessToken) return;
+    try {
+      // Fire notification to #general that a call is starting
+      const callUrl = `${window.location.origin}/call/${workspaceId}`;
+      await notifyCallStart(accessToken, workspaceId, callUrl);
+    } catch (err) {
+      console.error('[Call] notify error', err);
+      // keep silent, still navigate to call
+    }
+    router.push(`/call/${workspaceId}`);
+  };
+
 
   return (
     <div className="h-screen flex overflow-hidden">
@@ -783,15 +797,15 @@ export default function ChatPage() {
               </svg>
             </Link>
 
-            <Link
-              href={`/call/${workspaceId}`}
+            <button
+              onClick={handleStartCall}
               className="p-2 hover:bg-light-gray rounded"
               title="Start Video Call"
             >
               <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-            </Link>
+            </button>
           </div>
         </div>
 
