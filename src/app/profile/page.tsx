@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { getCurrentUserProfile, updateProfile } from '@/app/actions/profiles';
+import { getCurrentUserProfile, updateProfile, uploadProfileImage } from '@/app/actions/profiles';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 
@@ -104,15 +104,18 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
+    // Validate file type - only allow image files
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
+      e.target.value = ''; // Clear the input
       return;
     }
 
     // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image size must be less than 5MB');
+      e.target.value = ''; // Clear the input
       return;
     }
 
