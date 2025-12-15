@@ -75,29 +75,6 @@ export async function createWorkspace(accessToken: string, name: string, organiz
     }
   }
 
-  // Add owner as workspace member
-  const { data: memberData, error: memberError } = await supabase
-    .from('workspace_members')
-    .insert({
-      workspace_id: workspace.id,
-      user_id: ownerId,
-      role: 'owner',
-    })
-    .select()
-  
-  console.log('[createWorkspace] Added owner as member:', { 
-    workspaceId: workspace.id, 
-    userId: ownerId, 
-    memberData,
-    memberError: memberError?.message 
-  })
-  
-  // Check if member insert failed
-  if (memberError) {
-    console.error('[createWorkspace] Failed to add owner as member:', memberError)
-    return { error: `Workspace created but failed to add you as member: ${memberError.message}`, data: null }
-  }
-
   // Create default channel
   const { data: channel } = await supabase
     .from('channels')
