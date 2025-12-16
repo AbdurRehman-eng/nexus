@@ -622,7 +622,7 @@ export default function ChatPage() {
         }
 
         // Fetch reactions (use fresh token)
-        let reactions = [];
+        let reactions: { emoji: string; count: number; users: string[] }[] = [];
         try {
           const reactionsResult = await getMessageReactions(currentAccessToken, msg.id);
           if (!reactionsResult.error) {
@@ -635,7 +635,7 @@ export default function ChatPage() {
         }
 
         // Fetch attachments (use fresh token)
-        let attachments = [];
+        let attachments: Attachment[] = [];
         try {
           const attachmentsResult = await getMessageAttachments(currentAccessToken, msg.id);
           if (!attachmentsResult.error) {
