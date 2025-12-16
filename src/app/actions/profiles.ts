@@ -112,90 +112,111 @@ export async function uploadProfileImage(
   accessToken: string,
   file: { name: string; type: string; size: number; arrayBuffer: ArrayBuffer }
 ) {
-  const supabase = getSupabaseAdmin()
+  try {
+    const supabase = getSupabaseAdmin()
 
-  const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken)
-  if (userError || !user) {
-    return { error: 'Not authenticated', data: null }
-  }
+    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken)
+    if (userError || !user) {
+      return { error: 'Not authenticated', data: null }
+    }
 
-  // Validate file size (max 5MB for profile images)
-  const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
-  if (file.size > MAX_IMAGE_SIZE) {
-    return { error: 'Image size exceeds 5MB limit', data: null }
-  }
+    // Validate file size (max 5MB for profile images)
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
+    if (file.size > MAX_IMAGE_SIZE) {
+      return { error: 'Image size exceeds 5MB limit', data: null }
+    }
 
-  // Validate file type (only images)
-  const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-    return { error: 'Only JPEG, PNG, GIF, and WebP images are allowed', data: null }
-  }
+    // Validate file type (only images)
+    const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return { error: 'Only JPEG, PNG, GIF, and WebP images are allowed', data: null }
+    }
 
-  // Delete old profile image if it exists
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('avatar_url')
-    .eq('id', user.id)
-    .single()
+    // Delete old profile image if it exists
+    const { data: currentProfile } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', user.id)
+      .single()
 
-  if (currentProfile?.avatar_url) {
-    // Extract path from URL if it's from our bucket
-    const url = currentProfile.avatar_url
-    if (url.includes('/storage/v1/object/public/profile-images/')) {
-      const pathMatch = url.match(/profile-images\/(.+)$/)
-      if (pathMatch && pathMatch[1]) {
-        await supabase.storage
-          .from('profile-images')
-          .remove([pathMatch[1]])
+    if (currentProfile?.avatar_url) {
+      // Extract path from URL if it's from our bucket
+      const url = currentProfile.avatar_url
+      if (url.includes('/storage/v1/object/public/profile-images/')) {
+        const pathMatch = url.match(/profile-images\/(.+)$/)
+        if (pathMatch && pathMatch[1]) {
+          await supabase.storage
+            .from('profile-images')
+            .remove([pathMatch[1]])
+        }
       }
     }
-  }
 
-  // Generate unique file path
-  const fileExt = file.name.split('.').pop() || 'jpg'
-  const fileName = `${user.id}-${Date.now()}.${fileExt}`
-  const filePath = fileName
+    // Generate unique file path
+    const fileExt = file.name.split('.').pop() || 'jpg'
+    const fileName = `${user.id}-${Date.now()}.${fileExt}`
+    const filePath = fileName
 
-  // Upload to Supabase Storage
-  const { error: uploadError } = await supabase.storage
-    .from('profile-images')
-    .upload(filePath, file.arrayBuffer, {
-      contentType: file.type,
-      cacheControl: '3600',
-      upsert: true // Allow overwriting
-    })
+    // Convert ArrayBuffer to Blob for better compatibility with Supabase Storage
+    const blob = new Blob([file.arrayBuffer], { type: file.type })
 
-  if (uploadError) {
-    console.error('[uploadProfileImage] Storage error:', uploadError)
-    return { error: `Upload failed: ${uploadError.message}`, data: null }
-  }
-
-  // Get public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from('profile-images')
-    .getPublicUrl(filePath)
-
-  // Update profile with new avatar URL
-  const { data: profile, error: updateError } = await supabase
-    .from('profiles')
-    .update({
-      avatar_url: publicUrl,
-      updated_at: new Date().toISOString()
-    })
-    .eq('id', user.id)
-    .select()
-    .single()
-
-  if (updateError) {
-    // Clean up uploaded file if database update fails
-    await supabase.storage
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
       .from('profile-images')
-      .remove([filePath])
-    
-    return { error: updateError.message, data: null }
-  }
+      .upload(filePath, blob, {
+        contentType: file.type,
+        cacheControl: '3600',
+        upsert: true // Allow overwriting
+      })
 
-  revalidatePath('/profile')
-  revalidatePath(`/profile/${user.id}`)
-  return { data: { url: publicUrl, profile }, error: null }
+    if (uploadError) {
+      console.error('[uploadProfileImage] Storage error:', uploadError)
+      
+      // Provide more specific error messages
+      if (uploadError.message?.includes('Bucket not found') || uploadError.message?.includes('does not exist')) {
+        return { error: 'Storage bucket "profile-images" does not exist. Please create it in Supabase Storage.', data: null }
+      }
+      
+      if (uploadError.message?.includes('new row violates row-level security')) {
+        return { error: 'Permission denied. Please check storage bucket policies.', data: null }
+      }
+      
+      return { error: `Upload failed: ${uploadError.message || 'Unknown error'}`, data: null }
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('profile-images')
+      .getPublicUrl(filePath)
+
+    // Update profile with new avatar URL
+    const { data: profile, error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        avatar_url: publicUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id)
+      .select()
+      .single()
+
+    if (updateError) {
+      // Clean up uploaded file if database update fails
+      await supabase.storage
+        .from('profile-images')
+        .remove([filePath])
+      
+      return { error: updateError.message, data: null }
+    }
+
+    revalidatePath('/profile')
+    revalidatePath(`/profile/${user.id}`)
+    return { data: { url: publicUrl, profile }, error: null }
+  } catch (error: any) {
+    console.error('[uploadProfileImage] Unexpected error:', error)
+    return { 
+      error: error?.message || 'An unexpected error occurred during upload. Please try again.', 
+      data: null 
+    }
+  }
 }
