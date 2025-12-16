@@ -94,16 +94,75 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const realtimeConnectedRef = useRef<boolean>(false);
+  const supabaseClientRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const subscriptionCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     checkAuthAndLoad();
   }, [workspaceId]);
 
+  // Separate effect for auth state changes (important for OAuth accounts)
+  useEffect(() => {
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] Auth state changed:', event, session?.user?.id);
+      
+      // When session is established (especially for OAuth), ensure realtime is connected
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+        if (activeChannelId && accessToken) {
+          console.log('[Auth] Session established, ensuring realtime subscription is active');
+          // Small delay to ensure everything is ready
+          setTimeout(() => {
+            if (activeChannelId && !realtimeConnectedRef.current) {
+              console.log('[Auth] Realtime not connected, setting up subscription...');
+              if (subscriptionCleanupRef.current) {
+                subscriptionCleanupRef.current();
+              }
+              const cleanup = setupRealtimeSubscription(activeChannelId);
+              subscriptionCleanupRef.current = cleanup;
+            }
+          }, 500);
+        }
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [activeChannelId, accessToken]);
+
   const checkAuthAndLoad = async () => {
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    
+    // For OAuth accounts, wait a bit and try multiple times
+    let session = null;
+    let attempts = 0;
+    const maxAttempts = 5;
+    
+    while (!session && attempts < maxAttempts) {
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('[Auth] Error getting session:', error);
+      }
+      
+      if (currentSession && currentSession.access_token) {
+        session = currentSession;
+        console.log('[Auth] ✅ Session loaded, user:', session.user.id, 'Provider:', session.user.app_metadata?.provider || 'email');
+        break;
+      }
+      
+      attempts++;
+      if (attempts < maxAttempts) {
+        console.log(`[Auth] Waiting for session... (attempt ${attempts}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
 
     if (!session) {
+      console.error('[Auth] No session available after', maxAttempts, 'attempts');
       router.push('/login');
       return;
     }
@@ -115,13 +174,89 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (activeChannelId) {
+    if (activeChannelId && accessToken) {
       setMessagesLoading(true);
       loadMessages(activeChannelId);
-      setupRealtimeSubscription(activeChannelId);
       loadDraftForChannel(activeChannelId);
+
+      // Clean up any existing subscription first
+      if (subscriptionCleanupRef.current) {
+        subscriptionCleanupRef.current();
+        subscriptionCleanupRef.current = null;
+      }
+
+      // Wait a bit for OAuth sessions to be fully established
+      // This is especially important for OAuth accounts
+      const setupSubscription = async () => {
+        const supabase = createClient();
+        
+        // For OAuth accounts, wait longer and verify session multiple times
+        let sessionReady = false;
+        let attempts = 0;
+        const maxAttempts = 10; // Try for up to 5 seconds
+        
+        while (!sessionReady && attempts < maxAttempts) {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('[Realtime] Error checking session:', error);
+          }
+          
+          if (session && session.access_token) {
+            console.log('[Realtime] ✅ Session ready for subscription setup');
+            console.log('[Realtime] User:', session.user.id, 'Provider:', session.user.app_metadata?.provider || 'email');
+            sessionReady = true;
+            break;
+          } else {
+            attempts++;
+            console.log(`[Realtime] Waiting for session... (attempt ${attempts}/${maxAttempts})`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+        
+        if (!sessionReady) {
+          console.warn('[Realtime] ⚠️ Session not ready after waiting, but proceeding with subscription setup');
+        }
+        
+        // Set up realtime subscription and store cleanup function
+        const cleanup = setupRealtimeSubscription(activeChannelId);
+        subscriptionCleanupRef.current = cleanup;
+      };
+
+      setupSubscription();
+
+      // Fallback: Poll for new messages every 5 seconds ONLY if realtime is not connected
+      const startPolling = () => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+        }
+        pollIntervalRef.current = setInterval(() => {
+          if (activeChannelId && accessToken && !realtimeConnectedRef.current) {
+            console.log('[Realtime] Polling for new messages (realtime not connected)');
+            loadMessages(activeChannelId);
+          }
+        }, 5000);
+      };
+
+      // Start polling if realtime is not connected
+      if (!realtimeConnectedRef.current) {
+        startPolling();
+      }
+
+      // Return cleanup function to unsubscribe when channel changes or component unmounts
+      return () => {
+        if (subscriptionCleanupRef.current) {
+          subscriptionCleanupRef.current();
+          subscriptionCleanupRef.current = null;
+        }
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        realtimeConnectedRef.current = false;
+      };
     }
-  }, [activeChannelId]);
+  }, [activeChannelId, accessToken]); // Removed realtimeConnected from dependencies!
 
   useEffect(() => {
     if (viewMode === 'drafts' && accessToken) {
@@ -233,57 +368,176 @@ export default function ChatPage() {
   };
 
   const setupRealtimeSubscription = (channelId: string) => {
-    const supabase = createClient();
+    // Reuse existing client or create new one
+    if (!supabaseClientRef.current) {
+      supabaseClientRef.current = createClient();
+    }
+    const supabase = supabaseClientRef.current;
+    
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let subscriptionStarted = false;
+
+    // Ensure we have a fresh session for realtime before subscribing
+    // This is critical for OAuth accounts which may need time to establish session
+    const initializeSubscription = async () => {
+      try {
+        console.log('[Realtime] Initializing subscription for channel:', channelId);
+        
+        // Wait for session to be available (important for OAuth)
+        // Try multiple times with increasing delays for OAuth accounts
+        let session = null;
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        while (!session && attempts < maxAttempts) {
+          const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) {
+            console.error(`[Realtime] Session error (attempt ${attempts + 1}):`, sessionError);
+            attempts++;
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 500 * attempts)); // Exponential backoff
+            }
+            continue;
+          }
+
+          if (currentSession) {
+            session = currentSession;
+            console.log('[Realtime] ✅ Session confirmed for realtime, user:', session.user.id, 'Provider:', session.user.app_metadata?.provider);
+            break;
+          } else {
+            console.warn(`[Realtime] No session available (attempt ${attempts + 1}/${maxAttempts})`);
+            attempts++;
+            
+            if (attempts < maxAttempts) {
+              // For OAuth accounts, try refreshing the session
+              console.log('[Realtime] Attempting to refresh session...');
+              const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+              
+              if (!refreshError && refreshedSession) {
+                session = refreshedSession;
+                console.log('[Realtime] ✅ Session refreshed for realtime, user:', refreshedSession.user.id);
+                break;
+              } else {
+                console.warn('[Realtime] Refresh failed, waiting before retry...');
+                await new Promise(resolve => setTimeout(resolve, 500 * attempts));
+              }
+            }
+          }
+        }
+
+        if (!session) {
+          console.error('[Realtime] ❌ Failed to get session after', maxAttempts, 'attempts. Cannot subscribe to realtime.');
+          realtimeConnectedRef.current = false;
+          return;
+        }
+
+        // Verify session has access token
+        if (!session.access_token) {
+          console.error('[Realtime] ❌ Session exists but has no access token');
+          realtimeConnectedRef.current = false;
+          return;
+        }
+
+        // Only start subscription once
+        if (!subscriptionStarted) {
+          subscriptionStarted = true;
+          console.log('[Realtime] Starting subscription to channel:', channelId);
+          await subscribeToChannel();
+        }
+      } catch (error) {
+        console.error('[Realtime] ❌ Error initializing subscription:', error);
+        realtimeConnectedRef.current = false;
+      }
+    };
+
+    // Start initialization
+    initializeSubscription();
 
     // Helper function to format a message with profile data
     const formatMessageWithProfile = async (msg: any) => {
-      if (!accessToken) return null;
+      if (!accessToken) {
+        console.log('[Realtime] No access token available');
+        return null;
+      }
 
-      const supabaseAdmin = createClient();
+      try {
+        // Use the same client that has the session
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, username, email, avatar_url')
+          .eq('id', msg.sender_id)
+          .single();
 
-      // Fetch sender's profile
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('id, username, email, avatar_url')
-        .eq('id', msg.sender_id)
-        .single();
+        if (profileError) {
+          console.log('[Realtime] Profile fetch error:', profileError);
+        }
 
-      // Fetch reactions
-      const reactionsResult = await getMessageReactions(accessToken, msg.id);
+        // Fetch reactions
+        const reactionsResult = await getMessageReactions(accessToken, msg.id);
+        if (reactionsResult.error) {
+          console.log('[Realtime] Reactions fetch error:', reactionsResult.error);
+        }
 
-      // Fetch attachments
-      const attachmentsResult = await getMessageAttachments(accessToken, msg.id);
+        // Fetch attachments
+        const attachmentsResult = await getMessageAttachments(accessToken, msg.id);
+        if (attachmentsResult.error) {
+          console.log('[Realtime] Attachments fetch error:', attachmentsResult.error);
+        }
 
-      return {
-        id: msg.id,
-        user: profile?.username || profile?.email?.split('@')[0] || 'Unknown',
-        avatar: profile?.avatar_url || (profile?.username?.[0]?.toUpperCase() || profile?.email?.[0]?.toUpperCase() || 'U'),
-        content: msg.content,
-        timestamp: new Date(msg.created_at).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit'
-        }),
-        senderId: msg.sender_id,
-        reactions: reactionsResult.data || [],
-        threadId: msg.thread_id,
-        editedAt: msg.edited_at,
-        deletedAt: msg.deleted_at,
-        attachments: attachmentsResult.data || [],
-      };
+        return {
+          id: msg.id,
+          user: profile?.username || profile?.email?.split('@')[0] || 'Unknown',
+          avatar: profile?.avatar_url || (profile?.username?.[0]?.toUpperCase() || profile?.email?.[0]?.toUpperCase() || 'U'),
+          content: msg.content,
+          timestamp: new Date(msg.created_at).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit'
+          }),
+          senderId: msg.sender_id,
+          reactions: reactionsResult.data || [],
+          threadId: msg.thread_id,
+          editedAt: msg.edited_at,
+          deletedAt: msg.deleted_at,
+          attachments: attachmentsResult.data || [],
+        };
+      } catch (error) {
+        console.error('[Realtime] Error formatting message:', error);
+        return null;
+      }
     };
 
     // Handle new message INSERT
     const handleNewMessage = async (payload: any) => {
+      console.log('[Realtime] INSERT event received:', payload);
       const newMsg = payload.new;
-      if (!newMsg || newMsg.channel_id !== channelId) return;
+      if (!newMsg) {
+        console.log('[Realtime] No new message data');
+        return;
+      }
 
+      if (newMsg.channel_id !== channelId) {
+        console.log('[Realtime] Message filtered - channelId mismatch:', newMsg.channel_id, 'vs', channelId);
+        return;
+      }
+
+      console.log('[Realtime] Formatting new message...');
       const formattedMessage = await formatMessageWithProfile(newMsg);
       if (formattedMessage) {
+        console.log('[Realtime] Adding message to state:', formattedMessage.id);
         setMessages(prev => {
           // Check if message already exists (prevent duplicates)
-          if (prev.some(m => m.id === formattedMessage.id)) return prev;
+          if (prev.some(m => m.id === formattedMessage.id)) {
+            console.log('[Realtime] Duplicate message, skipping');
+            return prev;
+          }
+          console.log('[Realtime] Message successfully added, new count:', prev.length + 1);
           return [...prev, formattedMessage];
         });
+      } else {
+        console.log('[Realtime] Failed to format message');
       }
     };
 
@@ -308,42 +562,151 @@ export default function ChatPage() {
       setMessages(prev => prev.filter(msg => msg.id !== deletedMsg.id));
     };
 
-    const channel = supabase
-      .channel(`messages:${channelId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        handleNewMessage
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        handleMessageUpdate
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'messages',
-          filter: `channel_id=eq.${channelId}`,
-        },
-        handleMessageDelete
-      )
-      .subscribe();
+    const subscribeToChannel = async () => {
+      // Double-check session before subscribing (critical for OAuth)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('[Realtime] ❌ Session error when subscribing:', sessionError);
+        realtimeConnectedRef.current = false;
+        return;
+      }
+      
+      if (!session) {
+        console.error('[Realtime] ❌ Cannot subscribe - no session available');
+        realtimeConnectedRef.current = false;
+        return;
+      }
+
+      if (!session.access_token) {
+        console.error('[Realtime] ❌ Cannot subscribe - session has no access token');
+        realtimeConnectedRef.current = false;
+        return;
+      }
+
+      console.log('[Realtime] Setting up subscription for channel:', channelId);
+      console.log('[Realtime] User ID:', session.user.id);
+      console.log('[Realtime] User email:', session.user.email);
+      console.log('[Realtime] Auth provider:', session.user.app_metadata?.provider || 'email');
+      console.log('[Realtime] Access token present:', !!session.access_token);
+      
+      // Remove existing channel if any
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+
+      channel = supabase
+        .channel(`messages:${channelId}`, {
+          config: {
+            broadcast: { self: true },
+            presence: { key: '' }
+          }
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `channel_id=eq.${channelId}`,
+          },
+          handleNewMessage
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+            filter: `channel_id=eq.${channelId}`,
+          },
+          handleMessageUpdate
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'messages',
+            filter: `channel_id=eq.${channelId}`,
+          },
+          handleMessageDelete
+        )
+        .subscribe(async (status, err) => {
+          const sessionInfo = await supabase.auth.getSession();
+          const userInfo = sessionInfo.data?.session?.user;
+          console.log('[Realtime] Subscription status:', status);
+          console.log('[Realtime] User:', userInfo?.id, userInfo?.email, 'Provider:', userInfo?.app_metadata?.provider);
+          if (err) {
+            console.error('[Realtime] Error details:', err);
+            console.error('[Realtime] Error message:', err.message || err);
+            console.error('[Realtime] Error type:', typeof err);
+          }
+          
+          if (status === 'SUBSCRIBED') {
+            console.log('[Realtime] ✅ Successfully subscribed to channel:', channelId);
+            console.log('[Realtime] ✅ Realtime is now active for user:', userInfo?.id);
+            reconnectAttempts = 0; // Reset on success
+            realtimeConnectedRef.current = true;
+            // Stop polling when realtime connects
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+          } else if (status === 'CHANNEL_ERROR') {
+            realtimeConnectedRef.current = false;
+            console.error('[Realtime] ❌ Channel error for channel:', channelId, 'Error details:', err);
+            
+            // For OAuth accounts, try refreshing session before reconnecting
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+              console.warn('[Realtime] No session available, attempting to refresh...');
+              const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
+              if (!refreshedSession) {
+                console.error('[Realtime] Failed to refresh session, cannot reconnect');
+                return;
+              }
+            }
+            
+            // Only reconnect if we haven't exceeded max attempts
+            if (reconnectAttempts < maxReconnectAttempts) {
+              reconnectAttempts++;
+              const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000); // Exponential backoff, max 30s
+              console.log(`[Realtime] Attempting reconnect ${reconnectAttempts}/${maxReconnectAttempts} in ${delay}ms...`);
+              
+              setTimeout(() => {
+                if (channel) {
+                  subscribeToChannel();
+                }
+              }, delay);
+            } else {
+              console.error('[Realtime] Max reconnection attempts reached. Realtime may not be enabled on the database.');
+              console.error('[Realtime] Please run: supabase/enable_realtime_extension.sql in Supabase SQL Editor');
+            }
+          } else if (status === 'TIMED_OUT') {
+            console.warn('[Realtime] ⏱️ Subscription timed out for channel:', channelId);
+            realtimeConnectedRef.current = false;
+            if (reconnectAttempts < maxReconnectAttempts) {
+              reconnectAttempts++;
+              setTimeout(() => subscribeToChannel(), 2000);
+            }
+          } else if (status === 'CLOSED') {
+            console.log('[Realtime] 🔒 Subscription closed for channel:', channelId);
+            realtimeConnectedRef.current = false;
+          }
+        });
+    };
+
+    // Subscription will be started by initializeSubscription() after session is confirmed
 
     return () => {
-      supabase.removeChannel(channel);
+      subscriptionStarted = false;
+      if (channel) {
+        console.log('[Realtime] Cleaning up subscription for channel:', channelId);
+        supabase.removeChannel(channel);
+        channel = null;
+        realtimeConnectedRef.current = false;
+      }
     };
   };
 
@@ -359,13 +722,26 @@ export default function ChatPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim() || !activeChannelId || sending || !accessToken) return;
+    if (!messageInput.trim() || !activeChannelId || sending) return;
+
+    // Refresh session to get fresh access token
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      toast.error('Session expired. Please refresh the page.');
+      router.push('/login');
+      return;
+    }
+
+    // Use fresh access token
+    const freshAccessToken = session.access_token;
 
     setSending(true);
     setError('');
 
     const result = await sendMessage(
-      accessToken,
+      freshAccessToken,
       activeChannelId,
       messageInput,
       replyToMessage?.id || null
@@ -377,11 +753,37 @@ export default function ChatPage() {
     } else {
       setMessageInput('');
       setReplyToMessage(null);
+
       // Clear draft after sending
-      if (activeChannelId && accessToken) {
-        await saveDraft(accessToken, workspaceId, activeChannelId, '');
+      if (activeChannelId && freshAccessToken) {
+        await saveDraft(freshAccessToken, workspaceId, activeChannelId, '');
       }
-      // No need to reload messages - realtime subscription will handle it
+
+      // Optimistically add the message to UI immediately
+      // This ensures sender sees their message right away
+      if (result.data) {
+        const optimisticMessage = {
+          id: result.data.id,
+          user: result.data.user,
+          avatar: result.data.avatar,
+          content: result.data.content,
+          timestamp: new Date(result.data.timestamp).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit'
+          }),
+          senderId: result.data.senderId,
+          reactions: [],
+          threadId: result.data.threadId,
+          attachments: [],
+        };
+
+        setMessages(prev => {
+          // Check if message already exists (realtime might have added it)
+          if (prev.some(m => m.id === optimisticMessage.id)) return prev;
+          return [...prev, optimisticMessage];
+        });
+      }
+
       toast.success('Message sent!');
     }
     setSending(false);
