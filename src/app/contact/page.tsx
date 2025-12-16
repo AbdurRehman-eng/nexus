@@ -201,11 +201,11 @@ export default function ContactPage() {
                 >
                   {loading ? 'Sending...' : 'Send Message'}
                 </button>
-              </form>
+              </form> // End of Contact Form
             )}
-          </div>
+          </div> // End of Right Side - Contact Form
         </div>
-      </main>
-    </div>
+      </main> // End of Main Content
+    </div> // End of Page Container
   );
 }
