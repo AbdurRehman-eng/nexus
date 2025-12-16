@@ -34,18 +34,23 @@ export async function getSavedItems(accessToken: string) {
     return { error: 'Not authenticated', data: null }
   }
 
-  const { data: savedItems, error } = await supabase
+  // First, load saved items with related message and channel.
+  // Note: we can't join directly to profiles here because there's no direct FK
+  // between messages.sender_id and profiles.id in Supabase's relationship cache.
+  const { data: rawSavedItems, error } = await supabase
     .from('saved_items')
     .select(`
-      *,
+      id,
+      user_id,
+      message_id,
+      created_at,
       message:messages(
         id,
         content,
         created_at,
         channel_id,
         sender_id,
-        channel:channels(id, name, workspace_id),
-        sender:profiles(id, username, email, avatar_url)
+        channel:channels(id, name, workspace_id)
       )
     `)
     .eq('user_id', user.id)
@@ -55,7 +60,45 @@ export async function getSavedItems(accessToken: string) {
     return { error: error.message, data: null }
   }
 
-  return { data: savedItems || [], error: null }
+  const savedItems = rawSavedItems || []
+
+  // Collect unique sender IDs from messages
+  const senderIds = [
+    ...new Set(
+      savedItems
+        .map((item: any) => item.message?.sender_id)
+        .filter((id: string | null | undefined) => !!id)
+    )
+  ] as string[]
+
+  let profilesMap = new Map<string, any>()
+
+  if (senderIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, username, email, avatar_url')
+      .in('id', senderIds)
+
+    profilesMap = new Map((profiles || []).map(p => [p.id, p]))
+  }
+
+  // Attach sender profile to each message as message.sender
+  const enrichedSavedItems = savedItems.map((item: any) => {
+    const msg = item.message
+    if (!msg) return item
+
+    const profile = profilesMap.get(msg.sender_id)
+
+    return {
+      ...item,
+      message: {
+        ...msg,
+        sender: profile || null,
+      },
+    }
+  })
+
+  return { data: enrichedSavedItems, error: null }
 }
 
 export async function saveMessage(accessToken: string, messageId: string) {
