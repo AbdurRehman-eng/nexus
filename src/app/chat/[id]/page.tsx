@@ -4,7 +4,8 @@ import { notifyCallStart } from '@/app/actions/calls';
 import { createChannel, getChannels } from '@/app/actions/channels';
 import { deleteDraft, getDrafts, saveDraft } from '@/app/actions/drafts';
 import { deleteAttachment, getMessageAttachments } from '@/app/actions/files';
-import { getDirectMessages, getWorkspaceMembers, sendDirectMessage } from '@/app/actions/members';
+import { getDirectMessages, sendDirectMessage } from '@/app/actions/members';
+import { getWorkspaceMembers } from '@/app/actions/workspaces';
 import { addReaction, deleteMessage, editMessage, getMessageReactions, getMessages, removeReaction, sendMessage } from '@/app/actions/messages';
 import { createReminder, deleteReminder, getReminders, processDueReminders } from '@/app/actions/reminders';
 import { getSavedItems, saveMessage, unsaveMessage } from '@/app/actions/saved-items';
@@ -215,6 +216,32 @@ export default function ChatPage() {
     };
   }, [accessToken, workspaceId]);
 
+  // Reload members when page becomes visible (e.g., when returning from members page)
+  useEffect(() => {
+    if (!accessToken || !workspaceId) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Reload members when page becomes visible to ensure count is up to date
+        loadWorkspaceMembers(accessToken);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Also reload on window focus (when user switches back to the tab)
+    const handleFocus = () => {
+      loadWorkspaceMembers(accessToken);
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [accessToken, workspaceId]);
+
   const checkAuthAndLoad = async () => {
     const supabase = createClient();
     
@@ -347,6 +374,9 @@ export default function ChatPage() {
       loadDrafts();
     } else if (viewMode === 'saved' && accessToken) {
       loadSavedItems();
+    } else if (viewMode === 'members' && accessToken) {
+      // Reload members when switching to members view to ensure count is up to date
+      loadWorkspaceMembers(accessToken);
     }
   }, [viewMode, accessToken]);
 
@@ -413,7 +443,20 @@ export default function ChatPage() {
   const loadWorkspaceMembers = async (token: string) => {
     const result = await getWorkspaceMembers(token, workspaceId);
     if (result.data) {
-      setWorkspaceMembers(result.data);
+      // Transform the data from workspaces.ts format to match the chat page's expected format
+      // workspaces.ts returns: { id: user_id, username, email, avatar_url, role, joined_at }
+      // chat page expects: { id, user_id, workspace_id, role, username, email, avatar_url, is_online }
+      const transformedMembers = result.data.map((member: any) => ({
+        id: member.id, // This is actually user_id from workspaces.ts
+        user_id: member.id, // Use the same id as user_id
+        workspace_id: workspaceId,
+        role: member.role,
+        username: member.username,
+        email: member.email,
+        avatar_url: member.avatar_url,
+        is_online: true, // Default to true, can be enhanced with presence tracking
+      }));
+      setWorkspaceMembers(transformedMembers);
     }
   };
 

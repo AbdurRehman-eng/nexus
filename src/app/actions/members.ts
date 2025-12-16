@@ -34,41 +34,54 @@ export async function getWorkspaceMembers(accessToken: string, workspaceId: stri
   }
 
   try {
-    // Get workspace members with user details
+    // First, get all workspace members (this ensures we get all members even if profiles are missing)
     const { data: members, error } = await supabase
       .from('workspace_members')
-      .select(`
-        id,
-        user_id,
-        workspace_id,
-        role,
-        created_at,
-        profiles!inner (
-          id,
-          username,
-          email,
-          avatar_url
-        )
-      `)
+      .select('id, user_id, workspace_id, role, created_at')
       .eq('workspace_id', workspaceId)
-      .order('profiles.username')
 
     if (error) {
       console.error('Error fetching workspace members:', error)
       return { error: 'Failed to fetch workspace members', data: null }
     }
 
+    if (!members || members.length === 0) {
+      return { data: [], error: null }
+    }
+
+    // Get user profiles for all members separately (left join approach)
+    const userIds = members.map(m => m.user_id)
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, username, email, avatar_url')
+      .in('id', userIds)
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError)
+      // Continue anyway - we'll use fallback values
+    }
+
+    // Map profiles by id for easy lookup
+    const profilesMap = new Map(profiles?.map(p => [p.id, p]) || [])
+
     // Transform data to include profile information at the top level
-    const transformedMembers = members?.map((member: any) => ({
-      id: member.id,
-      user_id: member.user_id,
-      workspace_id: member.workspace_id,
-      role: member.role,
-      username: member.profiles?.username || member.profiles?.email?.split('@')[0] || 'Unknown',
-      email: member.profiles?.email || '',
-      avatar_url: member.profiles?.avatar_url || null,
-      is_online: true, // For now, assume online. Can be enhanced with presence tracking
-    })) || []
+    // This ensures ALL members are included, even if they don't have profiles
+    const transformedMembers = members.map((member) => {
+      const profile = profilesMap.get(member.user_id)
+      return {
+        id: member.id,
+        user_id: member.user_id,
+        workspace_id: member.workspace_id,
+        role: member.role,
+        username: profile?.username || profile?.email?.split('@')[0] || 'Unknown',
+        email: profile?.email || '',
+        avatar_url: profile?.avatar_url || null,
+        is_online: true, // For now, assume online. Can be enhanced with presence tracking
+      }
+    })
+
+    // Sort by username for consistent ordering
+    transformedMembers.sort((a, b) => a.username.localeCompare(b.username))
 
     return { data: transformedMembers, error: null }
   } catch (error) {
