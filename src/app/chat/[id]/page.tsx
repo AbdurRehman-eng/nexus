@@ -599,12 +599,16 @@ export default function ChatPage() {
 
     // Helper function to format a message with profile data
     const formatMessageWithProfile = async (msg: any) => {
-      if (!accessToken) {
-        console.log('[Realtime] No access token available');
-        return null;
-      }
-
       try {
+        // Get fresh access token from session (don't rely on stale closure)
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session?.access_token) {
+          console.error('[Realtime] No session or access token available:', sessionError);
+          return null;
+        }
+
+        const currentAccessToken = session.access_token;
+
         // Use the same client that has the session
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -613,19 +617,34 @@ export default function ChatPage() {
           .single();
 
         if (profileError) {
-          console.log('[Realtime] Profile fetch error:', profileError);
+          console.error('[Realtime] Profile fetch error:', profileError);
+          // Don't return null - we can still show the message with fallback values
         }
 
-        // Fetch reactions
-        const reactionsResult = await getMessageReactions(accessToken, msg.id);
-        if (reactionsResult.error) {
-          console.log('[Realtime] Reactions fetch error:', reactionsResult.error);
+        // Fetch reactions (use fresh token)
+        let reactions = [];
+        try {
+          const reactionsResult = await getMessageReactions(currentAccessToken, msg.id);
+          if (!reactionsResult.error) {
+            reactions = reactionsResult.data || [];
+          } else {
+            console.log('[Realtime] Reactions fetch error:', reactionsResult.error);
+          }
+        } catch (reactionError) {
+          console.error('[Realtime] Error fetching reactions:', reactionError);
         }
 
-        // Fetch attachments
-        const attachmentsResult = await getMessageAttachments(accessToken, msg.id);
-        if (attachmentsResult.error) {
-          console.log('[Realtime] Attachments fetch error:', attachmentsResult.error);
+        // Fetch attachments (use fresh token)
+        let attachments = [];
+        try {
+          const attachmentsResult = await getMessageAttachments(currentAccessToken, msg.id);
+          if (!attachmentsResult.error) {
+            attachments = attachmentsResult.data || [];
+          } else {
+            console.log('[Realtime] Attachments fetch error:', attachmentsResult.error);
+          }
+        } catch (attachmentError) {
+          console.error('[Realtime] Error fetching attachments:', attachmentError);
         }
 
         return {
@@ -638,53 +657,215 @@ export default function ChatPage() {
             minute: '2-digit'
           }),
           senderId: msg.sender_id,
-          reactions: reactionsResult.data || [],
+          reactions: reactions,
           threadId: msg.thread_id,
           editedAt: msg.edited_at,
           deletedAt: msg.deleted_at,
-          attachments: attachmentsResult.data || [],
+          attachments: attachments,
         };
       } catch (error) {
         console.error('[Realtime] Error formatting message:', error);
-        return null;
+        // Even if formatting fails, return a basic message structure so it still appears
+        return {
+          id: msg.id,
+          user: 'Unknown',
+          avatar: 'U',
+          content: msg.content || '',
+          timestamp: new Date(msg.created_at || new Date()).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit'
+          }),
+          senderId: msg.sender_id,
+          reactions: [],
+          threadId: msg.thread_id,
+          editedAt: msg.edited_at,
+          deletedAt: msg.deleted_at,
+          attachments: [],
+        };
       }
     };
 
-    // Handle new message INSERT
+    // Handle new message INSERT (Broadcast method)
     const handleNewMessage = async (payload: any) => {
-      console.log('[Realtime] INSERT event received:', payload);
-      const newMsg = payload.new;
+      console.log('[Realtime] ===== BROADCAST INSERT EVENT RECEIVED =====');
+      console.log('[Realtime] Full payload:', JSON.stringify(payload, null, 2));
+      
+      // Broadcast payload structure from realtime.broadcast_changes():
+      // { event, meta, payload: { id, table, record, schema, operation, old_record }, type }
+      // The actual message data is in payload.payload.record
+      let newMsg = null;
+      if (payload.payload && payload.payload.record) {
+        newMsg = payload.payload.record;
+        console.log('[Realtime] ✅ Extracted message from payload.payload.record');
+        console.log('[Realtime] Record keys:', Object.keys(newMsg));
+      } else if (payload.payload && payload.payload.new) {
+        // Fallback for different payload structure
+        newMsg = payload.payload.new;
+        console.log('[Realtime] ✅ Extracted message from payload.payload.new (fallback)');
+      } else if (payload.new) {
+        // Another fallback
+        newMsg = payload.new;
+        console.log('[Realtime] ✅ Extracted message from payload.new (fallback)');
+      }
+      
       if (!newMsg) {
-        console.log('[Realtime] No new message data');
+        console.error('[Realtime] ❌ No new message data in payload');
+        console.error('[Realtime] Payload structure:', {
+          hasPayload: !!payload.payload,
+          hasRecord: !!payload.payload?.record,
+          hasNew: !!payload.payload?.new,
+          payloadKeys: Object.keys(payload),
+          payloadPayloadKeys: payload.payload ? Object.keys(payload.payload) : []
+        });
         return;
       }
+
+      console.log('[Realtime] ✅ Extracted message data:', {
+        id: newMsg.id,
+        channel_id: newMsg.channel_id,
+        sender_id: newMsg.sender_id,
+        content: newMsg.content?.substring(0, 50),
+        created_at: newMsg.created_at,
+        fullRecord: newMsg
+      });
+      console.log('[Realtime] Channel ID check:');
+      console.log('[Realtime] - Subscription channelId (from closure):', channelId);
+      console.log('[Realtime] - Message channel_id:', newMsg.channel_id);
+      console.log('[Realtime] - Channel match:', newMsg.channel_id === channelId);
 
       if (newMsg.channel_id !== channelId) {
-        console.log('[Realtime] Message filtered - channelId mismatch:', newMsg.channel_id, 'vs', channelId);
+        console.warn('[Realtime] ⚠️ Message filtered - channelId mismatch:', newMsg.channel_id, 'vs', channelId);
+        console.warn('[Realtime] This message is for a different channel, skipping...');
         return;
       }
 
-      console.log('[Realtime] Formatting new message...');
-      const formattedMessage = await formatMessageWithProfile(newMsg);
-      if (formattedMessage) {
-        console.log('[Realtime] Adding message to state:', formattedMessage.id);
-        setMessages(prev => {
-          // Check if message already exists (prevent duplicates)
-          if (prev.some(m => m.id === formattedMessage.id)) {
-            console.log('[Realtime] Duplicate message, skipping');
-            return prev;
-          }
-          console.log('[Realtime] Message successfully added, new count:', prev.length + 1);
-          return [...prev, formattedMessage];
+      // Double-check: Only process if this message is for the currently active channel
+      // Use a ref or get the current activeChannelId to avoid stale closure
+      // For now, we'll rely on the subscription channelId match above
+      console.log('[Realtime] ✅ Channel ID matches subscription, proceeding with message processing');
+
+      // Verify we have all required fields before proceeding
+      if (!newMsg.id || !newMsg.channel_id || !newMsg.sender_id) {
+        console.error('[Realtime] ❌ Message data incomplete:', {
+          hasId: !!newMsg.id,
+          hasChannelId: !!newMsg.channel_id,
+          hasSenderId: !!newMsg.sender_id,
+          hasContent: !!newMsg.content,
+          newMsgKeys: Object.keys(newMsg)
         });
-      } else {
-        console.log('[Realtime] Failed to format message');
+        return;
       }
+
+      console.log('[Realtime] ✅ Channel matches, formatting message...');
+      const formattedMessage = await formatMessageWithProfile(newMsg);
+      if (!formattedMessage) {
+        console.error('[Realtime] ❌ Failed to format message - formatMessageWithProfile returned null');
+        console.error('[Realtime] Raw message data:', newMsg);
+        return;
+      }
+
+      console.log('[Realtime] ✅ Message formatted successfully:', {
+        id: formattedMessage.id,
+        user: formattedMessage.user,
+        content: formattedMessage.content?.substring(0, 50),
+        senderId: formattedMessage.senderId,
+        threadId: formattedMessage.threadId
+      });
+      console.log('[Realtime] Adding message to state...');
+      console.log('[Realtime] Subscription channelId:', channelId);
+      console.log('[Realtime] Message channel_id:', newMsg.channel_id);
+      console.log('[Realtime] Message will be shown:', !formattedMessage.threadId ? 'YES (main message)' : 'NO (thread reply)');
+      
+      // Use functional update to ensure we get the latest state
+      setMessages(prev => {
+        console.log('[Realtime] ===== STATE UPDATE START =====');
+        console.log('[Realtime] Current messages in state:', prev.length);
+        console.log('[Realtime] Current message IDs:', prev.map(m => m.id));
+        
+        // Check if message already exists (prevent duplicates)
+        const exists = prev.some(m => m.id === formattedMessage.id);
+        if (exists) {
+          console.warn('[Realtime] ⚠️ Duplicate message detected, skipping. Message ID:', formattedMessage.id);
+          console.warn('[Realtime] Existing messages:', prev.map(m => ({ id: m.id, user: m.user })));
+          return prev;
+        }
+        
+        console.log('[Realtime] ✅ Adding new message to state!');
+        const newMessages = [...prev, formattedMessage];
+        console.log('[Realtime] ✅ New message count:', newMessages.length);
+        console.log('[Realtime] ✅ All message IDs after add:', newMessages.map(m => m.id));
+        
+        // Verify the message is in the array
+        const added = newMessages.find(m => m.id === formattedMessage.id);
+        if (added) {
+          console.log('[Realtime] ✅✅✅ Message confirmed in state array!');
+          console.log('[Realtime] Added message details:', {
+            id: added.id,
+            user: added.user,
+            content: added.content?.substring(0, 30),
+            threadId: added.threadId
+          });
+        } else {
+          console.error('[Realtime] ❌❌❌ ERROR: Message NOT found in state array after adding!');
+        }
+        
+        console.log('[Realtime] ===== STATE UPDATE END =====');
+        return newMessages;
+      });
+      
+      // Force a re-render check after state update
+      // Use requestAnimationFrame to ensure DOM update happens after React state update
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          console.log('[Realtime] Post-update check - verifying state was updated');
+          setMessages(current => {
+            console.log('[Realtime] State verification - current count:', current.length);
+            const messageExists = current.some(m => m.id === formattedMessage.id);
+            console.log('[Realtime] Message exists in state:', messageExists);
+            console.log('[Realtime] All message IDs in state:', current.map(m => m.id));
+            
+            if (!messageExists) {
+              console.error('[Realtime] ❌ Message missing from state! Re-adding...');
+              // Create a new array reference to force React re-render
+              const updated = [...current, formattedMessage];
+              console.log('[Realtime] Re-added message. New count:', updated.length);
+              return updated;
+            }
+            
+            // Message exists - verify it's renderable (not a thread reply if we're showing main messages)
+            const message = current.find(m => m.id === formattedMessage.id);
+            if (message) {
+              console.log('[Realtime] ✅ Message found in state:', {
+                id: message.id,
+                threadId: message.threadId,
+                willRender: !message.threadId
+              });
+            }
+            
+            // Return a new array reference to ensure React detects the change
+            return [...current];
+          });
+        }, 50);
+      });
+      
+      // Force a scroll to bottom after adding message
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 200);
     };
 
-    // Handle message UPDATE (edits)
+    // Handle message UPDATE (edits) - Broadcast method
     const handleMessageUpdate = async (payload: any) => {
-      const updatedMsg = payload.new;
+      // Broadcast payload structure: payload.payload.record contains the updated message
+      let updatedMsg = null;
+      if (payload.payload && payload.payload.record) {
+        updatedMsg = payload.payload.record;
+      } else if (payload.payload && payload.payload.new) {
+        updatedMsg = payload.payload.new;
+      } else if (payload.new) {
+        updatedMsg = payload.new;
+      }
+      
       if (!updatedMsg || updatedMsg.channel_id !== channelId) return;
 
       const formattedMessage = await formatMessageWithProfile(updatedMsg);
@@ -695,9 +876,18 @@ export default function ChatPage() {
       }
     };
 
-    // Handle message DELETE
+    // Handle message DELETE - Broadcast method
     const handleMessageDelete = (payload: any) => {
-      const deletedMsg = payload.old;
+      // Broadcast payload structure: payload.payload.old_record contains the deleted message
+      let deletedMsg = null;
+      if (payload.payload && payload.payload.old_record) {
+        deletedMsg = payload.payload.old_record;
+      } else if (payload.payload && payload.payload.old) {
+        deletedMsg = payload.payload.old;
+      } else if (payload.old) {
+        deletedMsg = payload.old;
+      }
+      
       if (!deletedMsg) return;
 
       setMessages(prev => prev.filter(msg => msg.id !== deletedMsg.id));
@@ -731,62 +921,74 @@ export default function ChatPage() {
       console.log('[Realtime] Auth provider:', session.user.app_metadata?.provider || 'email');
       console.log('[Realtime] Access token present:', !!session.access_token);
       
-      // Remove existing channel if any
+      // Remove existing channel if any (important to prevent duplicate subscriptions)
       if (channel) {
-        supabase.removeChannel(channel);
+        console.log('[Realtime] Removing existing channel before creating new one');
+        try {
+          await supabase.removeChannel(channel);
+          console.log('[Realtime] Existing channel removed');
+        } catch (removeError) {
+          console.warn('[Realtime] Error removing existing channel (may not exist):', removeError);
+        }
+        channel = null;
       }
 
+      // Set auth for Broadcast (required for private channels)
+      await supabase.realtime.setAuth(session.access_token);
+      
+      // Create private channel for Broadcast method
+      // Topic format: 'channel:<channelId>' (matches trigger function)
+      const broadcastTopic = `channel:${channelId}`;
+      console.log('[Realtime] Creating Broadcast channel for topic:', broadcastTopic);
       channel = supabase
-        .channel(`messages:${channelId}`, {
+        .channel(broadcastTopic, {
           config: {
-            broadcast: { self: true },
-            presence: { key: '' }
+            private: true, // Required for Broadcast authorization
           }
         })
         .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-            filter: `channel_id=eq.${channelId}`,
-          },
-          handleNewMessage
+          'broadcast',
+          { event: 'INSERT' },
+          (payload) => {
+            console.log('[Realtime] 🔔 BROADCAST INSERT event callback triggered!');
+            console.log('[Realtime] Payload received:', payload);
+            handleNewMessage(payload);
+          }
         )
         .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'messages',
-            filter: `channel_id=eq.${channelId}`,
-          },
-          handleMessageUpdate
+          'broadcast',
+          { event: 'UPDATE' },
+          (payload) => {
+            console.log('[Realtime] 🔔 BROADCAST UPDATE event callback triggered!');
+            handleMessageUpdate(payload);
+          }
         )
         .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'messages',
-            filter: `channel_id=eq.${channelId}`,
-          },
-          handleMessageDelete
+          'broadcast',
+          { event: 'DELETE' },
+          (payload) => {
+            console.log('[Realtime] 🔔 BROADCAST DELETE event callback triggered!');
+            handleMessageDelete(payload);
+          }
         )
         .subscribe(async (status, err) => {
           const sessionInfo = await supabase.auth.getSession();
           const userInfo = sessionInfo.data?.session?.user;
+          console.log('[Realtime] ===== SUBSCRIPTION STATUS CHANGE =====');
           console.log('[Realtime] Subscription status:', status);
+          console.log('[Realtime] Channel ID:', channelId);
           console.log('[Realtime] User:', userInfo?.id, userInfo?.email, 'Provider:', userInfo?.app_metadata?.provider);
           if (err) {
-            console.error('[Realtime] Error details:', err);
+            console.error('[Realtime] ❌ Error details:', err);
             console.error('[Realtime] Error message:', err.message || err);
             console.error('[Realtime] Error type:', typeof err);
           }
           
           if (status === 'SUBSCRIBED') {
-            console.log('[Realtime] ✅ Successfully subscribed to channel:', channelId);
+            console.log('[Realtime] ✅✅✅ Successfully subscribed to Broadcast channel:', broadcastTopic);
             console.log('[Realtime] ✅ Realtime is now active for user:', userInfo?.id);
+            console.log('[Realtime] ✅ Listening for INSERT/UPDATE/DELETE broadcasts');
+            console.log('[Realtime] ✅ Topic: channel:', channelId);
             reconnectAttempts = 0; // Reset on success
             realtimeConnectedRef.current = true;
             // Stop polling when realtime connects
@@ -796,17 +998,28 @@ export default function ChatPage() {
             }
           } else if (status === 'CHANNEL_ERROR') {
             realtimeConnectedRef.current = false;
-            console.error('[Realtime] ❌ Channel error for channel:', channelId, 'Error details:', err);
+            console.error('[Realtime] ❌ Channel error for Broadcast topic:', broadcastTopic);
+            if (err) {
+              console.error('[Realtime] Error details:', err);
+              console.error('[Realtime] Error message:', err.message || String(err));
+              console.error('[Realtime] Error type:', typeof err);
+              console.error('[Realtime] ⚠️ Broadcast errors usually mean:');
+              console.error('[Realtime] 1. Trigger function not created or has errors');
+              console.error('[Realtime] 2. Broadcast authorization policy missing');
+              console.error('[Realtime] 3. Session/auth token issues');
+            }
             
             // For OAuth accounts, try refreshing session before reconnecting
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            if (!currentSession) {
               console.warn('[Realtime] No session available, attempting to refresh...');
               const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
               if (!refreshedSession) {
                 console.error('[Realtime] Failed to refresh session, cannot reconnect');
                 return;
               }
+              // Update auth after refresh
+              await supabase.realtime.setAuth(refreshedSession.access_token);
             }
             
             // Only reconnect if we haven't exceeded max attempts
@@ -821,8 +1034,12 @@ export default function ChatPage() {
                 }
               }, delay);
             } else {
-              console.error('[Realtime] Max reconnection attempts reached. Realtime may not be enabled on the database.');
-              console.error('[Realtime] Please run: supabase/enable_realtime_extension.sql in Supabase SQL Editor');
+              console.error('[Realtime] Max reconnection attempts reached.');
+              console.error('[Realtime] Please verify:');
+              console.error('[Realtime] 1. Trigger function messages_changes() exists');
+              console.error('[Realtime] 2. Trigger handle_messages_changes is active');
+              console.error('[Realtime] 3. Broadcast authorization policy exists on realtime.messages');
+              console.error('[Realtime] 4. Run setup_broadcast_realtime.sql in Supabase SQL Editor');
             }
           } else if (status === 'TIMED_OUT') {
             console.warn('[Realtime] ⏱️ Subscription timed out for channel:', channelId);
@@ -1336,39 +1553,28 @@ export default function ChatPage() {
           icon: '🔔'
         });
         
-        // Force reload messages multiple times to ensure they appear
+        // Immediately reload messages for the active channel to show reminder messages
+        // The realtime subscription should also catch them, but this ensures they appear right away
         if (activeChannelId) {
-          console.log('[Reminders] Reloading messages to show reminders');
+          console.log('[Reminders] Reloading messages to show reminder messages immediately');
+          console.log('[Reminders] Active channel ID:', activeChannelId);
           
-          // Immediate reload
-          await loadMessages(activeChannelId);
-          
-          // Also manually add the reminder message to the current messages state
-          // This ensures it appears immediately without waiting for database sync
-          const now = new Date().toISOString();
-          const reminderMessages = Array.from({length: result.data.processed}, (_, i) => ({
-            id: `reminder-${Date.now()}-${i}`,
-            content: `🔔 **Reminder triggered!** Check your reminders for details.`,
-            user: 'System',
-            avatar: '🔔',
-            timestamp: now,
-            senderId: 'system',
-            reactions: [],
-            attachments: []
-          }));
-          
-          // Add reminder messages to current state for immediate display
-          setMessages(prev => [...prev, ...reminderMessages]);
-          
-          // Secondary reload after a short delay to get actual reminder content
+          // Small delay to ensure the database insert has completed
           setTimeout(async () => {
-            console.log('[Reminders] Secondary message reload');
+            console.log('[Reminders] Loading messages for channel:', activeChannelId);
             await loadMessages(activeChannelId);
-          }, 2000);
+            console.log('[Reminders] ✅ Messages reloaded - reminder should now be visible');
+          }, 500);
+          
+          // Also try immediately (in case the insert is very fast)
+          // This ensures the message appears as quickly as possible
+          await loadMessages(activeChannelId);
         }
         
         // Reload reminders list to update status
         await loadReminders(accessToken);
+        
+        console.log('[Reminders] Reminder messages should appear automatically via realtime subscription and manual reload');
       }
     } catch (error) {
       console.error('[Reminders] Error checking due reminders:', error);

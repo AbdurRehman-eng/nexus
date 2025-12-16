@@ -252,8 +252,13 @@ export async function processDueReminders(accessToken: string, workspaceId: stri
 
       if (messageError) {
         console.error('[Reminders] Error sending reminder message:', messageError)
+        console.error('[Reminders] Error details:', messageError.message, messageError.details)
       } else {
-        console.log('[Reminders] Reminder message sent successfully:', newMessage)
+        console.log('[Reminders] ✅ Reminder message sent successfully')
+        console.log('[Reminders] Message ID:', newMessage?.id)
+        console.log('[Reminders] Channel ID:', newMessage?.channel_id)
+        console.log('[Reminders] Content:', newMessage?.content?.substring(0, 50))
+        console.log('[Reminders] Full message:', newMessage)
         
         // Mark reminder as sent
         const { error: updateError } = await supabase
