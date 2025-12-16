@@ -44,7 +44,15 @@ export async function createReminder(
     return { error: 'Title and scheduled time are required', data: null }
   }
 
+  // The client now sends an ISO string (UTC) that was converted from local time
+  // So we can directly parse it as a Date object
   const scheduledDate = new Date(scheduledTime)
+  
+  // Validate the date was parsed correctly
+  if (isNaN(scheduledDate.getTime())) {
+    return { error: 'Invalid date format', data: null }
+  }
+  
   if (scheduledDate <= new Date()) {
     return { error: 'Scheduled time must be in the future', data: null }
   }

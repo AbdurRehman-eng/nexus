@@ -1210,6 +1210,24 @@ export default function ChatPage() {
     e.preventDefault();
     if (!reminderTitle.trim() || !reminderDateTime || !activeChannelId) return;
 
+    // Convert datetime-local value (local time) to UTC ISO string
+    // datetime-local gives format "YYYY-MM-DDTHH:mm" in user's local timezone
+    // We need to convert it to UTC before sending to server
+    const [datePart, timePart] = reminderDateTime.split('T');
+    if (!datePart || !timePart) {
+      toast.error('Invalid date format');
+      return;
+    }
+
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+
+    // Create Date object in user's local timezone (client-side)
+    const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    
+    // Convert to UTC ISO string to send to server
+    const utcDateTimeString = localDate.toISOString();
+
     setCreatingReminder(true);
     const result = await createReminder(
       accessToken,
@@ -1217,7 +1235,7 @@ export default function ChatPage() {
       activeChannelId,
       reminderTitle,
       reminderDescription,
-      reminderDateTime
+      utcDateTimeString
     );
 
     if (result.error) {
