@@ -428,11 +428,10 @@ export class MQLParser {
       this.advance();
       const args: ASTNode[] = [];
 
-      const currentType = this.currentToken.type;
-      if (currentType !== TokenType.RPAREN) {
+      if ((this.currentToken.type as TokenType) !== TokenType.RPAREN) {
         args.push(this.orExpression());
 
-        while (this.currentToken.type === TokenType.COMMA) {
+        while ((this.currentToken.type as TokenType) === TokenType.COMMA) {
           this.advance();
           args.push(this.orExpression());
         }

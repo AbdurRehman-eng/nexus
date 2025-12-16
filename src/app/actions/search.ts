@@ -1,7 +1,7 @@
 'use server'
 
-import { createClient } from '@supabase/supabase-js'
 import { MessageQueryLanguage } from '@/search/mql'
+import { createClient } from '@supabase/supabase-js'
 
 // Helper to create admin client for server-side operations
 function getSupabaseAdmin() {

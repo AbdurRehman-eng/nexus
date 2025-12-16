@@ -1,21 +1,23 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
-import { useRouter, useParams } from 'next/navigation';
-import { getChannels, createChannel } from '@/app/actions/channels';
-import { getMessages, sendMessage, getMessageReactions, addReaction, removeReaction, editMessage, deleteMessage } from '@/app/actions/messages';
-import { getWorkspace } from '@/app/actions/workspaces';
-import { getMessageAttachments, deleteAttachment } from '@/app/actions/files';
-import { getDrafts, saveDraft, deleteDraft } from '@/app/actions/drafts';
-import { getSavedItems, saveMessage, unsaveMessage, isMessageSaved } from '@/app/actions/saved-items';
 import { notifyCallStart } from '@/app/actions/calls';
-import { createClient } from '@/lib/supabase/client';
+import { createChannel, getChannels } from '@/app/actions/channels';
+import { deleteDraft, getDrafts, saveDraft } from '@/app/actions/drafts';
+import { deleteAttachment, getMessageAttachments } from '@/app/actions/files';
+import { getDirectMessages, getWorkspaceMembers, sendDirectMessage } from '@/app/actions/members';
+import { addReaction, deleteMessage, editMessage, getMessageReactions, getMessages, removeReaction, sendMessage } from '@/app/actions/messages';
+import { createReminder, deleteReminder, getReminders, processDueReminders } from '@/app/actions/reminders';
+import { getSavedItems, saveMessage, unsaveMessage } from '@/app/actions/saved-items';
+import { getWorkspace } from '@/app/actions/workspaces';
 import EmojiPicker from '@/components/EmojiPicker';
-import MessageActions from '@/components/MessageActions';
 import FileUpload from '@/components/FileUpload';
+import MessageActions from '@/components/MessageActions';
 import MessageAttachments from '@/components/MessageAttachments';
 import { MessageSkeletonList } from '@/components/MessageSkeleton';
+import { createClient } from '@/lib/supabase/client';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 
 interface Attachment {
@@ -46,6 +48,43 @@ interface Channel {
   name: string;
   description: string;
   is_private: boolean;
+}
+
+interface WorkspaceMember {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  role: string;
+  username: string;
+  email: string;
+  avatar_url?: string;
+  is_online: boolean;
+}
+
+interface DirectMessage {
+  id: string;
+  content: string;
+  timestamp: string;
+  sender_id: string;
+  sender_name: string;
+  avatar: string;
+}
+
+interface Reminder {
+  id: string;
+  title: string;
+  description: string;
+  scheduled_time: string;
+  status: 'pending' | 'sent' | 'cancelled';
+  workspace_id: string;
+  channel_id: string;
+  created_at: string;
+  channels?: {
+    name: string;
+    workspaces?: {
+      name: string;
+    }
+  }
 }
 
 export default function ChatPage() {
@@ -87,14 +126,31 @@ export default function ChatPage() {
   const [showThreadView, setShowThreadView] = useState(false);
 
   // Sidebar views
-  const [viewMode, setViewMode] = useState<'channels' | 'drafts' | 'saved'>('channels');
+  const [viewMode, setViewMode] = useState<'channels' | 'drafts' | 'saved' | 'members' | 'reminders'>('channels');
   const [drafts, setDrafts] = useState<any[]>([]);
   const [savedItems, setSavedItems] = useState<any[]>([]);
   const [savedMessageIds, setSavedMessageIds] = useState<Set<string>>(new Set());
 
+  // Members and DM state
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
+  const [showDMModal, setShowDMModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<WorkspaceMember | null>(null);
+  const [dmMessages, setDmMessages] = useState<DirectMessage[]>([]);
+  const [dmInput, setDmInput] = useState('');
+  const [sendingDM, setSendingDM] = useState(false);
+
+  // Reminders state
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [reminderTitle, setReminderTitle] = useState('');
+  const [reminderDescription, setReminderDescription] = useState('');
+  const [reminderDateTime, setReminderDateTime] = useState('');
+  const [creatingReminder, setCreatingReminder] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const draftSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const reminderCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const realtimeConnectedRef = useRef<boolean>(false);
   const supabaseClientRef = useRef<ReturnType<typeof createClient> | null>(null);
   const subscriptionCleanupRef = useRef<(() => void) | null>(null);
@@ -132,6 +188,32 @@ export default function ChatPage() {
       subscription.unsubscribe();
     };
   }, [activeChannelId, accessToken]);
+
+  // Check for due reminders every 10 seconds (for testing)
+  useEffect(() => {
+    if (!accessToken || !workspaceId) return;
+    
+    console.log('[Reminders] Setting up reminder check interval')
+    
+    // Clear existing interval
+    if (reminderCheckIntervalRef.current) {
+      clearInterval(reminderCheckIntervalRef.current);
+    }
+    
+    // Check immediately
+    checkForDueReminders();
+    
+    // Set up interval to check every 10 seconds (for testing)
+    reminderCheckIntervalRef.current = setInterval(() => {
+      checkForDueReminders();
+    }, 10000);
+    
+    return () => {
+      if (reminderCheckIntervalRef.current) {
+        clearInterval(reminderCheckIntervalRef.current);
+      }
+    };
+  }, [accessToken, workspaceId]);
 
   const checkAuthAndLoad = async () => {
     const supabase = createClient();
@@ -171,6 +253,8 @@ export default function ChatPage() {
     setCurrentUserId(session.user.id);
     await loadWorkspace(session.access_token);
     await loadChannels(session.access_token);
+    await loadWorkspaceMembers(session.access_token);
+    await loadReminders(session.access_token);
   };
 
   useEffect(() => {
@@ -324,6 +408,20 @@ export default function ChatPage() {
       }
     }
     setLoading(false);
+  };
+
+  const loadWorkspaceMembers = async (token: string) => {
+    const result = await getWorkspaceMembers(token, workspaceId);
+    if (result.data) {
+      setWorkspaceMembers(result.data);
+    }
+  };
+
+  const loadReminders = async (token: string) => {
+    const result = await getReminders(token, workspaceId);
+    if (result.data) {
+      setReminders(result.data);
+    }
   };
 
   const loadMessages = async (channelId: string) => {
@@ -1023,7 +1121,197 @@ export default function ChatPage() {
   };
 
   const handleDMsClick = () => {
-    toast('Direct Messages feature coming soon!', { icon: '💬' });
+    setViewMode('members');
+  };
+
+  const handleMembersClick = () => {
+    setViewMode('members');
+  };
+
+  const handleRemindersClick = () => {
+    setViewMode('reminders');
+    loadReminders(accessToken);
+  };
+
+  const handleStartDM = async (member: WorkspaceMember) => {
+    setSelectedMember(member);
+    const result = await getDirectMessages(accessToken, member.user_id);
+    if (result.data) {
+      setDmMessages(result.data);
+    }
+    setShowDMModal(true);
+  };
+
+  const handleSendDM = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMember || !dmInput.trim()) return;
+
+    setSendingDM(true);
+    const result = await sendDirectMessage(accessToken, selectedMember.user_id, dmInput);
+    
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      setDmInput('');
+      // Reload DM messages
+      const messagesResult = await getDirectMessages(accessToken, selectedMember.user_id);
+      if (messagesResult.data) {
+        setDmMessages(messagesResult.data);
+      }
+      toast.success('Message sent!');
+    }
+    setSendingDM(false);
+  };
+
+  const handleCreateReminder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reminderTitle.trim() || !reminderDateTime || !activeChannelId) return;
+
+    setCreatingReminder(true);
+    const result = await createReminder(
+      accessToken,
+      workspaceId,
+      activeChannelId,
+      reminderTitle,
+      reminderDescription,
+      reminderDateTime
+    );
+
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Reminder created!');
+      setReminderTitle('');
+      setReminderDescription('');
+      setReminderDateTime('');
+      setShowReminderModal(false);
+      await loadReminders(accessToken);
+    }
+    setCreatingReminder(false);
+  };
+
+  const handleDeleteReminder = async (reminderId: string) => {
+    if (!confirm('Are you sure you want to delete this reminder?')) return;
+    
+    const result = await deleteReminder(accessToken, reminderId);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Reminder deleted!');
+      await loadReminders(accessToken);
+    }
+  };
+
+  const playNotificationSound = () => {
+    try {
+      // Create a pleasant notification chime using Web Audio API
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // First chime
+      const osc1 = audioContext.createOscillator();
+      const gain1 = audioContext.createGain();
+      osc1.connect(gain1);
+      gain1.connect(audioContext.destination);
+      
+      osc1.frequency.value = 523; // C5
+      osc1.type = 'sine';
+      gain1.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      // Second chime (higher)
+      const osc2 = audioContext.createOscillator();
+      const gain2 = audioContext.createGain();
+      osc2.connect(gain2);
+      gain2.connect(audioContext.destination);
+      
+      osc2.frequency.value = 659; // E5
+      osc2.type = 'sine';
+      gain2.gain.setValueAtTime(0, audioContext.currentTime + 0.15);
+      gain2.gain.setValueAtTime(0.25, audioContext.currentTime + 0.15);
+      gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.6);
+      
+      // Third chime (highest)
+      const osc3 = audioContext.createOscillator();
+      const gain3 = audioContext.createGain();
+      osc3.connect(gain3);
+      gain3.connect(audioContext.destination);
+      
+      osc3.frequency.value = 784; // G5
+      osc3.type = 'sine';
+      gain3.gain.setValueAtTime(0, audioContext.currentTime + 0.3);
+      gain3.gain.setValueAtTime(0.2, audioContext.currentTime + 0.3);
+      gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
+      
+      // Start all oscillators
+      osc1.start(audioContext.currentTime);
+      osc1.stop(audioContext.currentTime + 0.3);
+      
+      osc2.start(audioContext.currentTime + 0.15);
+      osc2.stop(audioContext.currentTime + 0.6);
+      
+      osc3.start(audioContext.currentTime + 0.3);
+      osc3.stop(audioContext.currentTime + 0.8);
+      
+    } catch (error) {
+      console.log('Audio notification not supported:', error);
+    }
+  };
+
+  const checkForDueReminders = async () => {
+    if (!accessToken || !workspaceId) {
+      console.log('[Reminders] Skipping check - no accessToken or workspaceId')
+      return;
+    }
+    
+    console.log('[Reminders] Checking for due reminders...')
+    try {
+      const result = await processDueReminders(accessToken, workspaceId);
+      console.log('[Reminders] Check result:', result)
+      
+      if (result.data && result.data.processed > 0) {
+        console.log(`[Reminders] Processed ${result.data.processed} due reminders`);
+        playNotificationSound();
+        toast.success(`${result.data.processed} reminder(s) triggered!`, {
+          icon: '🔔'
+        });
+        
+        // Force reload messages multiple times to ensure they appear
+        if (activeChannelId) {
+          console.log('[Reminders] Reloading messages to show reminders');
+          
+          // Immediate reload
+          await loadMessages(activeChannelId);
+          
+          // Also manually add the reminder message to the current messages state
+          // This ensures it appears immediately without waiting for database sync
+          const now = new Date().toISOString();
+          const reminderMessages = Array.from({length: result.data.processed}, (_, i) => ({
+            id: `reminder-${Date.now()}-${i}`,
+            content: `🔔 **Reminder triggered!** Check your reminders for details.`,
+            user: 'System',
+            avatar: '🔔',
+            timestamp: now,
+            senderId: 'system',
+            reactions: [],
+            attachments: []
+          }));
+          
+          // Add reminder messages to current state for immediate display
+          setMessages(prev => [...prev, ...reminderMessages]);
+          
+          // Secondary reload after a short delay to get actual reminder content
+          setTimeout(async () => {
+            console.log('[Reminders] Secondary message reload');
+            await loadMessages(activeChannelId);
+          }, 2000);
+        }
+        
+        // Reload reminders list to update status
+        await loadReminders(accessToken);
+      }
+    } catch (error) {
+      console.error('[Reminders] Error checking due reminders:', error);
+    }
   };
 
   const handleDraftsClick = () => {
@@ -1088,13 +1376,23 @@ export default function ChatPage() {
             <div className="space-y-1">
               <button
                 onClick={handleDMsClick}
-                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${viewMode === 'channels' ? 'hover:bg-white/10' : 'hover:bg-white/10'
+                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${viewMode === 'members' ? 'bg-white/20' : 'hover:bg-white/10'
                   }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                 </svg>
-                All DMs
+                Members ({workspaceMembers.length})
+              </button>
+              <button
+                onClick={handleRemindersClick}
+                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${viewMode === 'reminders' ? 'bg-white/20' : 'hover:bg-white/10'
+                  }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Reminders ({reminders.filter(r => r.status === 'pending').length})
               </button>
               <button
                 onClick={handleDraftsClick}
@@ -1244,6 +1542,99 @@ export default function ChatPage() {
               </div>
             </div>
           )}
+
+          {viewMode === 'members' && (
+            <div>
+              <div className="text-xs font-semibold text-white/70 mb-2">WORKSPACE MEMBERS ({workspaceMembers.length})</div>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {workspaceMembers.length === 0 ? (
+                  <div className="text-white/50 text-sm px-3 py-2">Loading members...</div>
+                ) : (
+                  workspaceMembers.map((member) => (
+                    <div
+                      key={member.id}
+                      className="group flex items-center gap-2 px-3 py-2 rounded hover:bg-white/10 transition-colors cursor-pointer"
+                      onClick={() => handleStartDM(member)}
+                    >
+                      <div className="relative">
+                        <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm font-medium overflow-hidden">
+                          {member.avatar_url ? (
+                            <img src={member.avatar_url} alt={member.username} className="w-8 h-8 rounded-full object-cover" />
+                          ) : (
+                            member.username?.[0]?.toUpperCase() || 'U'
+                          )}
+                        </div>
+                        {member.is_online && (
+                          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-maroon rounded-full"></div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-white truncate">{member.username}</div>
+                        <div className="text-xs text-white/50">{member.role}</div>
+                      </div>
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {viewMode === 'reminders' && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-semibold text-white/70">REMINDERS</div>
+                <button
+                  onClick={() => setShowReminderModal(true)}
+                  className="p-1 hover:bg-white/10 rounded text-white/70 hover:text-white"
+                  title="Create reminder"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-1 max-h-64 overflow-y-auto">
+                {reminders.filter(r => r.status === 'pending').length === 0 ? (
+                  <div className="text-white/50 text-sm px-3 py-2">No pending reminders</div>
+                ) : (
+                  reminders
+                    .filter(r => r.status === 'pending')
+                    .map((reminder) => (
+                      <div
+                        key={reminder.id}
+                        className="group px-3 py-2 rounded hover:bg-white/10 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-white truncate">{reminder.title}</div>
+                            <div className="text-xs text-white/60 truncate">
+                              {new Date(reminder.scheduled_time).toLocaleString()}
+                            </div>
+                            {reminder.description && (
+                              <div className="text-xs text-white/50 truncate mt-1">{reminder.description}</div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteReminder(reminder.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/20 rounded transition-opacity"
+                            title="Delete reminder"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1283,6 +1674,14 @@ export default function ChatPage() {
             >
               AI Search
             </Link>
+
+            <button
+              onClick={() => setShowReminderModal(true)}
+              className="hidden sm:inline-flex px-4 py-2 bg-purple-600 text-white rounded-button hover:bg-purple-700 transition-colors text-sm"
+              title="Create Reminder"
+            >
+              + Reminder
+            </button>
 
             <Link
               href={`/workspace/${workspaceId}/members`}
@@ -1673,6 +2072,173 @@ export default function ChatPage() {
                     className="flex-1 px-4 py-2 bg-dark-red text-white rounded-lg hover:bg-maroon disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                   >
                     {creatingChannel ? 'Creating...' : 'Create Channel'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Direct Message Modal */}
+      {showDMModal && selectedMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">
+                  Direct Message with {selectedMember.username}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowDMModal(false);
+                    setSelectedMember(null);
+                    setDmMessages([]);
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* DM Messages */}
+              <div className="max-h-96 overflow-y-auto mb-4 border border-gray-200 rounded-lg p-4 bg-gray-50">
+                {dmMessages.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    No messages yet. Start a conversation!
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {dmMessages.map((dm) => (
+                      <div key={dm.id} className="flex gap-3">
+                        <img
+                          src={dm.avatar || '/default-avatar.png'}
+                          alt=""
+                          className="w-8 h-8 rounded-full"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{dm.sender_name}</span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(dm.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-gray-800 text-sm mt-1">{dm.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* DM Input */}
+              <form onSubmit={handleSendDM} className="flex gap-2">
+                <input
+                  type="text"
+                  value={dmInput}
+                  onChange={(e) => setDmInput(e.target.value)}
+                  placeholder="Type a message..."
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={sendingDM || !dmInput.trim()}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {sendingDM ? 'Sending...' : 'Send'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reminder Modal */}
+      {showReminderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Create Reminder</h2>
+                <button
+                  onClick={() => {
+                    setShowReminderModal(false);
+                    setReminderTitle('');
+                    setReminderDescription('');
+                    setReminderDateTime('');
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateReminder} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={reminderTitle}
+                    onChange={(e) => setReminderTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="Reminder title..."
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={reminderDescription}
+                    onChange={(e) => setReminderDescription(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    rows={3}
+                    placeholder="Description..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Schedule for
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={reminderDateTime}
+                    onChange={(e) => setReminderDateTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    required
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <button
+                    type="submit"
+                    disabled={creatingReminder}
+                    className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingReminder ? 'Creating...' : 'Create Reminder'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReminderModal(false);
+                      setReminderTitle('');
+                      setReminderDescription('');
+                      setReminderDateTime('');
+                    }}
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                  >
+                    Cancel
                   </button>
                 </div>
               </form>
