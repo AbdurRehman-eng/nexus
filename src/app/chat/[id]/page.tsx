@@ -778,80 +778,21 @@ export default function ChatPage() {
       
       // Use functional update to ensure we get the latest state
       setMessages(prev => {
-        console.log('[Realtime] ===== STATE UPDATE START =====');
-        console.log('[Realtime] Current messages in state:', prev.length);
-        console.log('[Realtime] Current message IDs:', prev.map(m => m.id));
-        
         // Check if message already exists (prevent duplicates)
         const exists = prev.some(m => m.id === formattedMessage.id);
         if (exists) {
           console.warn('[Realtime] ⚠️ Duplicate message detected, skipping. Message ID:', formattedMessage.id);
-          console.warn('[Realtime] Existing messages:', prev.map(m => ({ id: m.id, user: m.user })));
           return prev;
         }
         
-        console.log('[Realtime] ✅ Adding new message to state!');
-        const newMessages = [...prev, formattedMessage];
-        console.log('[Realtime] ✅ New message count:', newMessages.length);
-        console.log('[Realtime] ✅ All message IDs after add:', newMessages.map(m => m.id));
-        
-        // Verify the message is in the array
-        const added = newMessages.find(m => m.id === formattedMessage.id);
-        if (added) {
-          console.log('[Realtime] ✅✅✅ Message confirmed in state array!');
-          console.log('[Realtime] Added message details:', {
-            id: added.id,
-            user: added.user,
-            content: added.content?.substring(0, 30),
-            threadId: added.threadId
-          });
-        } else {
-          console.error('[Realtime] ❌❌❌ ERROR: Message NOT found in state array after adding!');
-        }
-        
-        console.log('[Realtime] ===== STATE UPDATE END =====');
-        return newMessages;
+        // Add new message to state
+        return [...prev, formattedMessage];
       });
       
-      // Force a re-render check after state update
-      // Use requestAnimationFrame to ensure DOM update happens after React state update
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          console.log('[Realtime] Post-update check - verifying state was updated');
-          setMessages(current => {
-            console.log('[Realtime] State verification - current count:', current.length);
-            const messageExists = current.some(m => m.id === formattedMessage.id);
-            console.log('[Realtime] Message exists in state:', messageExists);
-            console.log('[Realtime] All message IDs in state:', current.map(m => m.id));
-            
-            if (!messageExists) {
-              console.error('[Realtime] ❌ Message missing from state! Re-adding...');
-              // Create a new array reference to force React re-render
-              const updated = [...current, formattedMessage];
-              console.log('[Realtime] Re-added message. New count:', updated.length);
-              return updated;
-            }
-            
-            // Message exists - verify it's renderable (not a thread reply if we're showing main messages)
-            const message = current.find(m => m.id === formattedMessage.id);
-            if (message) {
-              console.log('[Realtime] ✅ Message found in state:', {
-                id: message.id,
-                threadId: message.threadId,
-                willRender: !message.threadId
-              });
-            }
-            
-            // Return a new array reference to ensure React detects the change
-            return [...current];
-          });
-        }, 50);
-      });
-      
-      // Force a scroll to bottom after adding message
+      // Scroll to bottom after adding message
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 200);
+      }, 100);
     };
 
     // Handle message UPDATE (edits) - Broadcast method
@@ -1553,28 +1494,14 @@ export default function ChatPage() {
           icon: '🔔'
         });
         
-        // Immediately reload messages for the active channel to show reminder messages
-        // The realtime subscription should also catch them, but this ensures they appear right away
-        if (activeChannelId) {
-          console.log('[Reminders] Reloading messages to show reminder messages immediately');
-          console.log('[Reminders] Active channel ID:', activeChannelId);
-          
-          // Small delay to ensure the database insert has completed
-          setTimeout(async () => {
-            console.log('[Reminders] Loading messages for channel:', activeChannelId);
-            await loadMessages(activeChannelId);
-            console.log('[Reminders] ✅ Messages reloaded - reminder should now be visible');
-          }, 500);
-          
-          // Also try immediately (in case the insert is very fast)
-          // This ensures the message appears as quickly as possible
-          await loadMessages(activeChannelId);
-        }
+        // Reminder messages are inserted into the messages table
+        // The broadcast realtime trigger will automatically broadcast these INSERTs
+        // The realtime subscription will catch them and display them in chat automatically
+        // No need to manually reload messages - realtime handles it!
+        console.log('[Reminders] Reminder messages will appear automatically via broadcast realtime');
         
-        // Reload reminders list to update status
+        // Reload reminders list to update status (mark as 'sent')
         await loadReminders(accessToken);
-        
-        console.log('[Reminders] Reminder messages should appear automatically via realtime subscription and manual reload');
       }
     } catch (error) {
       console.error('[Reminders] Error checking due reminders:', error);

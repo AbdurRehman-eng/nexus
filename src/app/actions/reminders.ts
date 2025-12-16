@@ -240,12 +240,16 @@ export async function processDueReminders(accessToken: string, workspaceId: stri
       const reminderMessage = `🔔 **Reminder: ${reminder.title}**${reminder.description ? `\n\n${reminder.description}` : ''}`
 
       // Send message to the channel
+      // Note: This INSERT will trigger the broadcast realtime trigger (handle_messages_changes)
+      // The trigger will broadcast to topic 'channel:<channel_id>' and clients subscribed to that channel
+      // will receive the message automatically via realtime - no manual reload needed!
       const { data: newMessage, error: messageError } = await supabase
         .from('messages')
         .insert([{
           content: reminderMessage,
           channel_id: reminder.channel_id,
           sender_id: reminder.created_by
+          // created_at, thread_id, edited_at, deleted_at will use database defaults (NULL for optional fields)
         }])
         .select()
         .single()
