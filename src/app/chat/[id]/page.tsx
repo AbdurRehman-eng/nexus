@@ -65,7 +65,7 @@ export default function ChatPage() {
   const [error, setError] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [currentUserId, setCurrentUserId] = useState('');
-  
+
   // UI state
   const [showSidebar, setShowSidebar] = useState(false);
   const [showAddChannelModal, setShowAddChannelModal] = useState(false);
@@ -73,19 +73,19 @@ export default function ChatPage() {
   const [newChannelDescription, setNewChannelDescription] = useState('');
   const [newChannelIsPrivate, setNewChannelIsPrivate] = useState(false);
   const [creatingChannel, setCreatingChannel] = useState(false);
-  
+
   // Edit state
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
-  
+
   // Reaction state
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
-  
+
   // Thread state
   const [replyToMessage, setReplyToMessage] = useState<Message | null>(null);
   const [threadMessages, setThreadMessages] = useState<Message[]>([]);
   const [showThreadView, setShowThreadView] = useState(false);
-  
+
   // Sidebar views
   const [viewMode, setViewMode] = useState<'channels' | 'drafts' | 'saved'>('channels');
   const [drafts, setDrafts] = useState<any[]>([]);
@@ -102,12 +102,12 @@ export default function ChatPage() {
   const checkAuthAndLoad = async () => {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
-    
+
     if (!session) {
       router.push('/login');
       return;
     }
-    
+
     setAccessToken(session.access_token);
     setCurrentUserId(session.user.id);
     await loadWorkspace(session.access_token);
@@ -172,7 +172,7 @@ export default function ChatPage() {
     setLoading(true);
     setError('');
     const result = await getChannels(token, workspaceId);
-    
+
     if (result.error) {
       setError(result.error);
       if (result.error === 'Not authenticated') {
@@ -181,7 +181,7 @@ export default function ChatPage() {
     } else {
       const channelsData = result.data || [];
       setChannels(channelsData);
-      
+
       if (channelsData.length > 0) {
         const firstChannel = channelsData[0];
         setActiveChannelId(firstChannel.id);
@@ -193,11 +193,11 @@ export default function ChatPage() {
 
   const loadMessages = async (channelId: string) => {
     if (!accessToken) return;
-    
+
     setMessagesLoading(true);
     setError('');
     const result = await getMessages(accessToken, channelId);
-    
+
     if (result.error) {
       setError(result.error);
       setMessagesLoading(false);
@@ -217,9 +217,9 @@ export default function ChatPage() {
           user: msg.user,
           avatar: msg.avatar,
           content: msg.content,
-          timestamp: new Date(msg.timestamp).toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit' 
+          timestamp: new Date(msg.timestamp).toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit'
           }),
           senderId: msg.senderId,
           reactions: reactionsResult.data || [],
@@ -234,20 +234,111 @@ export default function ChatPage() {
 
   const setupRealtimeSubscription = (channelId: string) => {
     const supabase = createClient();
-    
+
+    // Helper function to format a message with profile data
+    const formatMessageWithProfile = async (msg: any) => {
+      if (!accessToken) return null;
+
+      const supabaseAdmin = createClient();
+
+      // Fetch sender's profile
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('id, username, email, avatar_url')
+        .eq('id', msg.sender_id)
+        .single();
+
+      // Fetch reactions
+      const reactionsResult = await getMessageReactions(accessToken, msg.id);
+
+      // Fetch attachments
+      const attachmentsResult = await getMessageAttachments(accessToken, msg.id);
+
+      return {
+        id: msg.id,
+        user: profile?.username || profile?.email?.split('@')[0] || 'Unknown',
+        avatar: profile?.avatar_url || (profile?.username?.[0]?.toUpperCase() || profile?.email?.[0]?.toUpperCase() || 'U'),
+        content: msg.content,
+        timestamp: new Date(msg.created_at).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit'
+        }),
+        senderId: msg.sender_id,
+        reactions: reactionsResult.data || [],
+        threadId: msg.thread_id,
+        editedAt: msg.edited_at,
+        deletedAt: msg.deleted_at,
+        attachments: attachmentsResult.data || [],
+      };
+    };
+
+    // Handle new message INSERT
+    const handleNewMessage = async (payload: any) => {
+      const newMsg = payload.new;
+      if (!newMsg || newMsg.channel_id !== channelId) return;
+
+      const formattedMessage = await formatMessageWithProfile(newMsg);
+      if (formattedMessage) {
+        setMessages(prev => {
+          // Check if message already exists (prevent duplicates)
+          if (prev.some(m => m.id === formattedMessage.id)) return prev;
+          return [...prev, formattedMessage];
+        });
+      }
+    };
+
+    // Handle message UPDATE (edits)
+    const handleMessageUpdate = async (payload: any) => {
+      const updatedMsg = payload.new;
+      if (!updatedMsg || updatedMsg.channel_id !== channelId) return;
+
+      const formattedMessage = await formatMessageWithProfile(updatedMsg);
+      if (formattedMessage) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === formattedMessage.id ? formattedMessage : msg
+        ));
+      }
+    };
+
+    // Handle message DELETE
+    const handleMessageDelete = (payload: any) => {
+      const deletedMsg = payload.old;
+      if (!deletedMsg) return;
+
+      setMessages(prev => prev.filter(msg => msg.id !== deletedMsg.id));
+    };
+
     const channel = supabase
       .channel(`messages:${channelId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'messages',
           filter: `channel_id=eq.${channelId}`,
         },
-        () => {
-          loadMessages(channelId);
-        }
+        handleNewMessage
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        handleMessageUpdate
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        handleMessageDelete
       )
       .subscribe();
 
@@ -272,14 +363,14 @@ export default function ChatPage() {
 
     setSending(true);
     setError('');
-    
+
     const result = await sendMessage(
-      accessToken, 
-      activeChannelId, 
-      messageInput, 
+      accessToken,
+      activeChannelId,
+      messageInput,
       replyToMessage?.id || null
     );
-    
+
     if (result.error) {
       toast.error(result.error);
       setError(result.error);
@@ -290,7 +381,7 @@ export default function ChatPage() {
       if (activeChannelId && accessToken) {
         await saveDraft(accessToken, workspaceId, activeChannelId, '');
       }
-      await loadMessages(activeChannelId);
+      // No need to reload messages - realtime subscription will handle it
       toast.success('Message sent!');
     }
     setSending(false);
@@ -298,48 +389,50 @@ export default function ChatPage() {
 
   const handleEditMessage = async (messageId: string) => {
     if (!editContent.trim() || !accessToken) return;
-    
+
     const result = await editMessage(accessToken, messageId, editContent);
-    
+
     if (result.error) {
       toast.error(result.error);
     } else {
       toast.success('Message updated!');
       setEditingMessageId(null);
       setEditContent('');
-      if (activeChannelId) {
-        await loadMessages(activeChannelId);
-      }
+      // No need to reload messages - realtime subscription will handle it
     }
   };
 
   const handleDeleteMessage = async (messageId: string) => {
     if (!accessToken) return;
-    
+
     if (!confirm('Are you sure you want to delete this message?')) return;
-    
+
     const result = await deleteMessage(accessToken, messageId);
-    
+
     if (result.error) {
       toast.error(result.error);
     } else {
       toast.success('Message deleted!');
-      if (activeChannelId) {
-        await loadMessages(activeChannelId);
-      }
+      // No need to reload messages - realtime subscription will handle it
     }
   };
 
   const handleAddReaction = async (messageId: string, emoji: string) => {
     if (!accessToken) return;
-    
+
     const result = await addReaction(accessToken, messageId, emoji);
-    
+
     if (result.error) {
       toast.error(result.error);
     } else {
-      if (activeChannelId) {
-        await loadMessages(activeChannelId);
+      // Update reactions for this specific message
+      const reactionsResult = await getMessageReactions(accessToken, messageId);
+      if (!reactionsResult.error) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId
+            ? { ...msg, reactions: reactionsResult.data || [] }
+            : msg
+        ));
       }
     }
     setShowEmojiPicker(null);
@@ -347,14 +440,20 @@ export default function ChatPage() {
 
   const handleRemoveReaction = async (messageId: string, emoji: string) => {
     if (!accessToken) return;
-    
+
     const result = await removeReaction(accessToken, messageId, emoji);
-    
+
     if (result.error) {
       toast.error(result.error);
     } else {
-      if (activeChannelId) {
-        await loadMessages(activeChannelId);
+      // Update reactions for this specific message
+      const reactionsResult = await getMessageReactions(accessToken, messageId);
+      if (!reactionsResult.error) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId
+            ? { ...msg, reactions: reactionsResult.data || [] }
+            : msg
+        ));
       }
     }
   };
@@ -383,11 +482,11 @@ export default function ChatPage() {
 
   const handleDeleteAttachment = async (attachmentId: string) => {
     if (!accessToken) return;
-    
+
     if (!confirm('Are you sure you want to delete this attachment?')) return;
-    
+
     const result = await deleteAttachment(accessToken, attachmentId);
-    
+
     if (result.error) {
       toast.error(result.error);
     } else {
@@ -404,7 +503,7 @@ export default function ChatPage() {
 
   const handleCreateChannel = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newChannelName.trim()) {
       toast.error('Channel name is required');
       return;
@@ -431,7 +530,7 @@ export default function ChatPage() {
     setNewChannelIsPrivate(false);
     setShowAddChannelModal(false);
     setCreatingChannel(false);
-    
+
     // Reload channels
     await loadChannels(accessToken);
   };
@@ -553,7 +652,7 @@ export default function ChatPage() {
     <div className="h-screen flex overflow-hidden">
       {/* Mobile Overlay */}
       {showSidebar && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setShowSidebar(false)}
         />
@@ -585,33 +684,30 @@ export default function ChatPage() {
           <div>
             <div className="text-xs font-semibold text-white/70 mb-2">GENERAL</div>
             <div className="space-y-1">
-              <button 
+              <button
                 onClick={handleDMsClick}
-                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${
-                  viewMode === 'channels' ? 'hover:bg-white/10' : 'hover:bg-white/10'
-                }`}
+                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${viewMode === 'channels' ? 'hover:bg-white/10' : 'hover:bg-white/10'
+                  }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
                 All DMs
               </button>
-              <button 
+              <button
                 onClick={handleDraftsClick}
-                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${
-                  viewMode === 'drafts' ? 'bg-white/20' : 'hover:bg-white/10'
-                }`}
+                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${viewMode === 'drafts' ? 'bg-white/20' : 'hover:bg-white/10'
+                  }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
                 Drafts
               </button>
-              <button 
+              <button
                 onClick={handleSavedItemsClick}
-                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${
-                  viewMode === 'saved' ? 'bg-white/20' : 'hover:bg-white/10'
-                }`}
+                className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center gap-2 ${viewMode === 'saved' ? 'bg-white/20' : 'hover:bg-white/10'
+                  }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -634,15 +730,14 @@ export default function ChatPage() {
                     <button
                       key={channel.id}
                       onClick={() => handleChannelClick(channel)}
-                      className={`w-full text-left px-3 py-2 rounded transition-colors ${
-                        activeChannelId === channel.id ? 'bg-white/20' : 'hover:bg-white/10'
-                      }`}
+                      className={`w-full text-left px-3 py-2 rounded transition-colors ${activeChannelId === channel.id ? 'bg-white/20' : 'hover:bg-white/10'
+                        }`}
                     >
                       #{channel.name}
                     </button>
                   ))
                 )}
-                <button 
+                <button
                   onClick={() => setShowAddChannelModal(true)}
                   className="w-full text-left px-3 py-2 rounded hover:bg-white/10 transition-colors text-white/70 flex items-center gap-2"
                 >
@@ -764,8 +859,8 @@ export default function ChatPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
-            
-            <button 
+
+            <button
               onClick={() => router.push('/homepage')}
               className="hidden sm:block p-2 hover:bg-light-gray rounded"
             >
@@ -773,13 +868,13 @@ export default function ChatPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            
+
             <h1 className="text-lg sm:text-xl font-bold truncate">{activeChannelName}</h1>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
-            
-            
+
+
             <Link
               href="/ai-search"
               className="hidden sm:inline-flex px-4 py-2 bg-dark-red text-white rounded-button hover:bg-maroon transition-colors text-sm"
@@ -825,149 +920,148 @@ export default function ChatPage() {
           ) : (
             <div className="p-3 sm:p-6 space-y-4">
               {messages.filter(m => !m.threadId).map((message) => (
-              <div key={message.id} className="flex gap-2 sm:gap-3 group relative">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-dark-red text-white flex items-center justify-center font-semibold flex-shrink-0 text-sm sm:text-base overflow-hidden">
-                  {message.avatar && (message.avatar.startsWith('http://') || message.avatar.startsWith('https://')) ? (
-                    <img
-                      src={message.avatar}
-                      alt={message.user}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        // Fallback to initials if image fails to load
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        const parent = target.parentElement;
-                        if (parent) {
-                          parent.textContent = message.user?.[0]?.toUpperCase() || 'U';
-                        }
-                      }}
-                    />
-                  ) : (
-                    message.avatar || message.user?.[0]?.toUpperCase() || 'U'
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="font-semibold text-sm sm:text-base truncate">{message.user}</span>
-                    <span className="text-xs text-gray-500 flex-shrink-0">{message.timestamp}</span>
-                    {message.editedAt && (
-                      <span className="text-xs text-gray-400">(edited)</span>
+                <div key={message.id} className="flex gap-2 sm:gap-3 group relative">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-dark-red text-white flex items-center justify-center font-semibold flex-shrink-0 text-sm sm:text-base overflow-hidden">
+                    {message.avatar && (message.avatar.startsWith('http://') || message.avatar.startsWith('https://')) ? (
+                      <img
+                        src={message.avatar}
+                        alt={message.user}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initials if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.textContent = message.user?.[0]?.toUpperCase() || 'U';
+                          }
+                        }}
+                      />
+                    ) : (
+                      message.avatar || message.user?.[0]?.toUpperCase() || 'U'
                     )}
                   </div>
-                  
-                  {editingMessageId === message.id ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-input resize-none text-sm"
-                        rows={3}
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditMessage(message.id)}
-                          className="px-3 py-1 bg-dark-red text-white rounded text-sm hover:bg-maroon"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingMessageId(null);
-                            setEditContent('');
-                          }}
-                          className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
-                        >
-                          Cancel
-                        </button>
-                      </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-2 mb-1">
+                      <span className="font-semibold text-sm sm:text-base truncate">{message.user}</span>
+                      <span className="text-xs text-gray-500 flex-shrink-0">{message.timestamp}</span>
+                      {message.editedAt && (
+                        <span className="text-xs text-gray-400">(edited)</span>
+                      )}
                     </div>
-                  ) : (
-                    <>
-                      <p className="text-gray-800 text-sm sm:text-base break-words">{message.content}</p>
-                      <MessageAttachments 
-                        attachments={message.attachments || []}
-                        currentUserId={currentUserId}
-                        onDelete={handleDeleteAttachment}
-                      />
-                    </>
-                  )}
-                  
-                  {message.reactions && message.reactions.length > 0 && (
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      {message.reactions.map((reaction, idx) => {
-                        const userReaction = getUserReaction(message);
-                        const isThisReaction = userReaction === reaction.emoji;
-                        return (
+
+                    {editingMessageId === message.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-input resize-none text-sm"
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
                           <button
-                            key={idx}
-                            onClick={() => {
-                              if (isThisReaction) {
-                                // Remove if clicking on user's current reaction
-                                handleRemoveReaction(message.id, reaction.emoji);
-                              } else {
-                                // Switch to this reaction (will replace user's existing reaction if any)
-                                handleAddReaction(message.id, reaction.emoji);
-                              }
-                            }}
-                            className={`px-2 py-1 border rounded-full text-xs sm:text-sm hover:border-dark-red transition-colors ${
-                              isThisReaction ? 'bg-blue-50 border-dark-red' : 'bg-white border-gray-border'
-                            }`}
+                            onClick={() => handleEditMessage(message.id)}
+                            className="px-3 py-1 bg-dark-red text-white rounded text-sm hover:bg-maroon"
                           >
-                            {reaction.emoji} {reaction.count}
+                            Save
                           </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                  
-                  {getThreadCount(message.id) > 0 && (
-                    <button 
-                      onClick={() => handleViewThread(message)}
-                      className="text-xs sm:text-sm text-dark-red hover:underline mt-2 flex items-center gap-1"
-                    >
-                      <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                      </svg>
-                      {getThreadCount(message.id)} {getThreadCount(message.id) === 1 ? 'reply' : 'replies'}
-                    </button>
-                  )}
-                </div>
-                
-                {/* Message Actions */}
-                <div className="absolute top-0 right-0 -mt-2">
-                  <MessageActions
-                    messageId={message.id}
-                    isOwnMessage={message.senderId === currentUserId}
-                    onReply={() => handleReply(message)}
-                    onEdit={() => {
-                      setEditingMessageId(message.id);
-                      setEditContent(message.content);
-                    }}
-                    onDelete={() => handleDeleteMessage(message.id)}
-                    onReact={() => setShowEmojiPicker(message.id)}
-                    onSave={() => {
-                      if (savedMessageIds.has(message.id)) {
-                        handleUnsaveMessage(message.id);
-                      } else {
-                        handleSaveMessage(message.id);
-                      }
-                    }}
-                    isSaved={savedMessageIds.has(message.id)}
-                  />
-                </div>
-                
-                {/* Emoji Picker */}
-                {showEmojiPicker === message.id && (
-                  <div className="relative">
-                    <EmojiPicker
-                      onEmojiSelect={(emoji) => handleAddReaction(message.id, emoji)}
-                      onClose={() => setShowEmojiPicker(null)}
+                          <button
+                            onClick={() => {
+                              setEditingMessageId(null);
+                              setEditContent('');
+                            }}
+                            className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-gray-800 text-sm sm:text-base break-words">{message.content}</p>
+                        <MessageAttachments
+                          attachments={message.attachments || []}
+                          currentUserId={currentUserId}
+                          onDelete={handleDeleteAttachment}
+                        />
+                      </>
+                    )}
+
+                    {message.reactions && message.reactions.length > 0 && (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {message.reactions.map((reaction, idx) => {
+                          const userReaction = getUserReaction(message);
+                          const isThisReaction = userReaction === reaction.emoji;
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                if (isThisReaction) {
+                                  // Remove if clicking on user's current reaction
+                                  handleRemoveReaction(message.id, reaction.emoji);
+                                } else {
+                                  // Switch to this reaction (will replace user's existing reaction if any)
+                                  handleAddReaction(message.id, reaction.emoji);
+                                }
+                              }}
+                              className={`px-2 py-1 border rounded-full text-xs sm:text-sm hover:border-dark-red transition-colors ${isThisReaction ? 'bg-blue-50 border-dark-red' : 'bg-white border-gray-border'
+                                }`}
+                            >
+                              {reaction.emoji} {reaction.count}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {getThreadCount(message.id) > 0 && (
+                      <button
+                        onClick={() => handleViewThread(message)}
+                        className="text-xs sm:text-sm text-dark-red hover:underline mt-2 flex items-center gap-1"
+                      >
+                        <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                        {getThreadCount(message.id)} {getThreadCount(message.id) === 1 ? 'reply' : 'replies'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Message Actions */}
+                  <div className="absolute top-0 right-0 -mt-2">
+                    <MessageActions
+                      messageId={message.id}
+                      isOwnMessage={message.senderId === currentUserId}
+                      onReply={() => handleReply(message)}
+                      onEdit={() => {
+                        setEditingMessageId(message.id);
+                        setEditContent(message.content);
+                      }}
+                      onDelete={() => handleDeleteMessage(message.id)}
+                      onReact={() => setShowEmojiPicker(message.id)}
+                      onSave={() => {
+                        if (savedMessageIds.has(message.id)) {
+                          handleUnsaveMessage(message.id);
+                        } else {
+                          handleSaveMessage(message.id);
+                        }
+                      }}
+                      isSaved={savedMessageIds.has(message.id)}
                     />
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Emoji Picker */}
+                  {showEmojiPicker === message.id && (
+                    <div className="relative">
+                      <EmojiPicker
+                        onEmojiSelect={(emoji) => handleAddReaction(message.id, emoji)}
+                        onClose={() => setShowEmojiPicker(null)}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -1016,7 +1110,7 @@ export default function ChatPage() {
                 />
                 <div className="flex items-center gap-2 px-3 sm:px-4 py-2 border-t border-gray-border">
                   {messages.length > 0 && messages[messages.length - 1] && (
-                    <FileUpload 
+                    <FileUpload
                       messageId={messages[messages.length - 1].id}
                       accessToken={accessToken}
                       onUploadComplete={() => activeChannelId && loadMessages(activeChannelId)}
