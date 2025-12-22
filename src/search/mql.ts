@@ -3,7 +3,7 @@
  * 
  * This module implements a complete domain-specific language for querying messages
  * with support for conditions, logical operators, field access, and functions.
- * 
+ *  
  * Architecture:
  * - MQLLexer: Tokenizes input string into meaningful tokens
  * - MQLParser: Parses tokens into an Abstract Syntax Tree (AST)
