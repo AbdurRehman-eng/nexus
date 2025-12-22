@@ -1,37 +1,41 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { createWorkspace } from '@/app/actions/workspaces';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createWorkspace } from "@/app/actions/workspaces";
+import { createClient } from "@/lib/supabase/client";
 
 export default function CreateWorkspace() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [workspaceName, setWorkspaceName] = useState('');
-  const [organizationType, setOrganizationType] = useState<'private' | 'public'>('private');
-  const [coworkerEmail, setCoworkerEmail] = useState('');
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [organizationType, setOrganizationType] = useState<
+    "private" | "public"
+  >("private");
+  const [coworkerEmail, setCoworkerEmail] = useState("");
   const [coworkers, setCoworkers] = useState<string[]>([]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
-  const [accessToken, setAccessToken] = useState('');
+  const [userEmail, setUserEmail] = useState("");
+  const [accessToken, setAccessToken] = useState("");
 
   // Check authentication and get user info
   useEffect(() => {
     const checkAuth = async () => {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (!session) {
-        router.push('/login');
+        router.push("/login");
         return;
       }
-      
+
       setAccessToken(session.access_token);
-      setUserEmail(session.user.email || '');
+      setUserEmail(session.user.email || "");
     };
-    
+
     checkAuth();
   }, [router]);
 
@@ -49,7 +53,7 @@ export default function CreateWorkspace() {
     const email = coworkerEmail.trim().toLowerCase();
     if (email && !coworkers.includes(email)) {
       setCoworkers([...coworkers, email]);
-      setCoworkerEmail('');
+      setCoworkerEmail("");
     }
   };
 
@@ -59,63 +63,138 @@ export default function CreateWorkspace() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     // Pass access token to authenticate the request
-    const result = await createWorkspace(accessToken, workspaceName, organizationType, coworkers);
-    
+    const result = await createWorkspace(
+      accessToken,
+      workspaceName,
+      organizationType,
+      coworkers
+    );
+
     if (result.error) {
       setError(result.error);
       setLoading(false);
     } else {
       // Redirect to homepage after successful creation
-      router.push('/homepage');
+      router.push("/homepage");
     }
   };
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Instructions */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-dark-red to-maroon text-white p-16 flex-col justify-center">
-        {step === 1 ? (
-          <>
-            <h1 className="text-4xl font-bold mb-6">
-              What do you want to call your workspace?
-            </h1>
-            <p className="text-xl leading-relaxed">
-              Choose something your team will recognize. You can always change this later.
-            </p>
-          </>
-        ) : (
-          <>
-            <h1 className="text-4xl font-bold mb-6">
-              Who else is on the {workspaceName} workspace?
-            </h1>
-            <p className="text-xl leading-relaxed">
-              Add coworkers by email to invite them to your workspace. They'll receive an invitation to join.
-            </p>
-          </>
-        )}
-
-        <div className="mt-12 flex items-center gap-3">
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${step === 1 ? 'bg-white text-dark-red' : 'bg-white/30 text-white'}`}>
-            1
+      {/* Left Side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#4A0808] text-white p-12 flex-col relative overflow-hidden">
+        {/* Logo at top */}
+        <div className="relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center">
+              <div className="w-6 h-6 bg-gradient-to-br from-white to-gray-200 rounded"></div>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">NEXUS</h1>
+              <p className="text-xs text-white/70">by AKD</p>
+            </div>
           </div>
-          <div className="h-1 w-12 bg-white/30"></div>
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold ${step === 2 ? 'bg-white text-dark-red' : 'bg-white/30 text-white'}`}>
-            2
+        </div>
+
+        {/* Content centered vertically */}
+        <div className="flex-1 flex flex-col justify-center relative z-10 max-w-lg">
+          {/* Single Card for All Content */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/10">
+            {step === 1 ? (
+              <>
+                <h2 className="text-4xl font-bold mb-6 text-white leading-tight">
+                  Create Your Workspace
+                </h2>
+                <p className="text-lg leading-relaxed text-white/80 mb-8">
+                  Choose a name that your team will recognize. You can always
+                  change this later.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-sm text-white/70">
+                    <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                    <span>Organize your team communications</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-white/70">
+                    <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                    <span>Choose between private or public workspace</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-white/70">
+                    <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                    <span>Invite team members to collaborate</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-4xl font-bold mb-6 text-white leading-tight">
+                  Build Your Team
+                </h2>
+                <p className="text-lg leading-relaxed text-white/80 mb-8">
+                  Add coworkers by email to invite them to {workspaceName}.
+                  They'll receive an invitation to join.
+                </p>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-sm text-white/70">
+                    <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                    <span>Invite unlimited team members</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-white/70">
+                    <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                    <span>Manage permissions and roles</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm text-white/70">
+                    <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                    <span>Start collaborating instantly</span>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Progress Indicator */}
+            <div className="mt-12 flex items-center gap-3">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all ${
+                  step === 1
+                    ? "bg-white text-[#4A0808]"
+                    : "bg-white/30 text-white"
+                }`}
+              >
+                1
+              </div>
+              <div className="h-1 w-12 bg-white/30"></div>
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all ${
+                  step === 2
+                    ? "bg-white text-[#4A0808]"
+                    : "bg-white/30 text-white"
+                }`}
+              >
+                2
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Right Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 md:p-8 bg-white">
-        <div className="w-full max-w-md">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-[#E5E9F0]">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 sm:p-10">
+          {/* Mobile header */}
+          <h2 className="lg:hidden text-3xl font-bold text-[#1C2143] mb-8 text-center">
+            {step === 1 ? "Create Workspace" : "Add Team Members"}
+          </h2>
+
           {step === 1 ? (
             <form onSubmit={handleStep1Next} className="space-y-6">
               <div>
-                <label htmlFor="workspaceName" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="workspaceName"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Workspace Name *
                 </label>
                 <input
@@ -136,22 +215,22 @@ export default function CreateWorkspace() {
                 <div className="flex gap-4">
                   <button
                     type="button"
-                    onClick={() => setOrganizationType('private')}
-                    className={`flex-1 py-3 px-4 rounded-input border-2 font-medium transition-colors ${
-                      organizationType === 'private'
-                        ? 'border-dark-red bg-dark-red text-white'
-                        : 'border-gray-border hover:border-dark-red'
+                    onClick={() => setOrganizationType("private")}
+                    className={`flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-all ${
+                      organizationType === "private"
+                        ? "border-[#1C2143] bg-[#1C2143] text-white"
+                        : "border-gray-300 hover:border-[#3A506B] text-gray-700"
                     }`}
                   >
                     Private
                   </button>
                   <button
                     type="button"
-                    onClick={() => setOrganizationType('public')}
-                    className={`flex-1 py-3 px-4 rounded-input border-2 font-medium transition-colors ${
-                      organizationType === 'public'
-                        ? 'border-dark-red bg-dark-red text-white'
-                        : 'border-gray-border hover:border-dark-red'
+                    onClick={() => setOrganizationType("public")}
+                    className={`flex-1 py-3 px-4 rounded-lg border-2 font-medium transition-all ${
+                      organizationType === "public"
+                        ? "border-[#1C2143] bg-[#1C2143] text-white"
+                        : "border-gray-300 hover:border-[#3A506B] text-gray-700"
                     }`}
                   >
                     Public
@@ -159,15 +238,17 @@ export default function CreateWorkspace() {
                 </div>
               </div>
 
-              <button type="submit" className="btn-primary w-full">
+              <button
+                type="submit"
+                className="bg-[#1C2143] hover:bg-[#3A506B] text-white w-full py-3 rounded-lg font-semibold transition-all"
+              >
                 Next
               </button>
             </form>
           ) : (
             <form onSubmit={handleCreate} className="space-y-6">
-              <h2 className="lg:hidden text-2xl font-bold text-dark-red mb-4">Add Team Members</h2>
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-input text-sm">
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
                   {error}
                 </div>
               )}
@@ -177,14 +258,17 @@ export default function CreateWorkspace() {
                 </label>
                 <input
                   type="email"
-                  value={userEmail || 'Loading...'}
+                  value={userEmail || "Loading..."}
                   className="input-field bg-gray-100"
                   disabled
                 />
               </div>
 
               <div>
-                <label htmlFor="coworkerEmail" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="coworkerEmail"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Add Coworker by Email
                 </label>
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -194,7 +278,7 @@ export default function CreateWorkspace() {
                     value={coworkerEmail}
                     onChange={(e) => setCoworkerEmail(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         e.preventDefault();
                         handleAddCoworker();
                       }
@@ -207,7 +291,7 @@ export default function CreateWorkspace() {
                     type="button"
                     onClick={handleAddCoworker}
                     disabled={loading || !coworkerEmail.trim()}
-                    className="px-4 py-2 bg-dark-red text-white rounded-button font-semibold hover:bg-maroon disabled:opacity-50 w-full sm:w-auto"
+                    className="px-4 py-2 bg-[#1C2143] text-white rounded-lg font-semibold hover:bg-[#3A506B] disabled:opacity-50 transition-all w-full sm:w-auto"
                   >
                     Add
                   </button>
@@ -216,14 +300,19 @@ export default function CreateWorkspace() {
 
               {coworkers.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700">Added Coworkers:</p>
+                  <p className="text-sm font-medium text-gray-700">
+                    Added Coworkers:
+                  </p>
                   {coworkers.map((email) => (
-                    <div key={email} className="flex items-center justify-between p-3 bg-light-gray rounded-input">
-                      <span className="text-sm">{email}</span>
+                    <div
+                      key={email}
+                      className="flex items-center justify-between p-3 bg-[#E5E9F0] rounded-lg"
+                    >
+                      <span className="text-sm text-gray-700">{email}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveCoworker(email)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
                       >
                         Remove
                       </button>
@@ -236,13 +325,17 @@ export default function CreateWorkspace() {
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="btn-secondary flex-1 w-full"
+                  className="flex-1 w-full px-6 py-3 border-2 border-[#3A506B] text-[#3A506B] rounded-lg font-semibold hover:bg-[#3A506B] hover:text-white transition-all"
                   disabled={loading}
                 >
                   Back
                 </button>
-                <button type="submit" className="btn-primary flex-1 w-full" disabled={loading}>
-                  {loading ? 'Creating...' : 'Create Workspace'}
+                <button
+                  type="submit"
+                  className="bg-[#1C2143] hover:bg-[#3A506B] text-white flex-1 w-full py-3 rounded-lg font-semibold transition-all"
+                  disabled={loading}
+                >
+                  {loading ? "Creating..." : "Create Workspace"}
                 </button>
               </div>
             </form>
