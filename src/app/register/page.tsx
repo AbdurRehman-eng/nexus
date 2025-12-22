@@ -1,26 +1,26 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { signInWithGoogle } from '@/app/actions/auth';
-import { createClient } from '@/lib/supabase/client';
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { signInWithGoogle } from "@/app/actions/auth";
+import { createClient } from "@/lib/supabase/client";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     // Basic password validation
     if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError("Password must be at least 6 characters long");
       setLoading(false);
       return;
     }
@@ -28,21 +28,21 @@ export default function RegisterPage() {
     try {
       // Use client-side Supabase auth directly for reliable cookie management
       const supabase = createClient();
-      
-      console.log('[Register] Calling signUp...');
+
+      console.log("[Register] Calling signUp...");
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
-            username: email.split('@')[0],
+            username: email.split("@")[0],
           },
         },
       });
 
       if (signUpError) {
-        console.error('[Register] Registration failed:', signUpError.message);
+        console.error("[Register] Registration failed:", signUpError.message);
         setError(signUpError.message);
         setLoading(false);
         return;
@@ -50,37 +50,44 @@ export default function RegisterPage() {
 
       // Check if email confirmation is required
       if (data.user && !data.session) {
-        console.log('[Register] Email confirmation required');
-        setError('');
-        alert('Please check your email to confirm your account before signing in.');
-        router.push('/login');
+        console.log("[Register] Email confirmation required");
+        setError("");
+        alert(
+          "Please check your email to confirm your account before signing in."
+        );
+        router.push("/login");
         return;
       }
 
       // If session exists, user is automatically signed in
       if (data.session) {
-        console.log('[Register] Registration successful, user auto-signed in:', {
-          userId: data.user?.id,
-          email: data.user?.email,
-        });
-        
+        console.log(
+          "[Register] Registration successful, user auto-signed in:",
+          {
+            userId: data.user?.id,
+            email: data.user?.email,
+          }
+        );
+
         // Redirect to homepage
-        router.push('/homepage');
+        router.push("/homepage");
       } else {
         // Unexpected case
-        console.warn('[Register] No session and no confirmation required');
-        setError('Registration succeeded but session not created. Please try logging in.');
+        console.warn("[Register] No session and no confirmation required");
+        setError(
+          "Registration succeeded but session not created. Please try logging in."
+        );
         setLoading(false);
       }
     } catch (err) {
-      console.error('[Register] Error:', err);
-      setError('An error occurred. Please try again.');
+      console.error("[Register] Error:", err);
+      setError("An error occurred. Please try again.");
       setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
-    setError('');
+    setError("");
     setLoading(true);
     await signInWithGoogle();
   };
@@ -92,13 +99,14 @@ export default function RegisterPage() {
         {/* Gradient Background Effect */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
-        
+
         <div className="relative z-10">
           <h1 className="text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-200 leading-tight tracking-tight">
             Welcome to Nexus
           </h1>
           <p className="text-lg leading-relaxed text-gray-100 max-w-md animate-fade-in">
-            Seamlessly connect, collaborate, and create with your team in real-time.
+            Seamlessly connect, collaborate, and create with your team in
+            real-time.
           </p>
           <div className="mt-8 space-y-3">
             <div className="flex items-center gap-3 text-sm text-gray-200">
@@ -120,8 +128,10 @@ export default function RegisterPage() {
       {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          <h2 className="text-3xl font-bold text-dark-red mb-8 text-center">Create Account</h2>
-          
+          <h2 className="text-3xl font-bold text-dark-red mb-8 text-center">
+            Create Account
+          </h2>
+
           <form onSubmit={handleRegister} className="space-y-6">
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-input text-sm">
@@ -129,7 +139,10 @@ export default function RegisterPage() {
               </div>
             )}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Email Address
               </label>
               <input
@@ -145,7 +158,10 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Password
               </label>
               <input
@@ -160,8 +176,12 @@ export default function RegisterPage() {
               />
             </div>
 
-            <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? 'Creating Account...' : 'Register'}
+            <button
+              type="submit"
+              className="btn-primary w-full"
+              disabled={loading}
+            >
+              {loading ? "Creating Account..." : "Register"}
             </button>
 
             <div className="relative my-6">
@@ -169,7 +189,9 @@ export default function RegisterPage() {
                 <div className="w-full border-t border-gray-border"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                <span className="px-2 bg-white text-gray-500">
+                  Or continue with
+                </span>
               </div>
             </div>
 
@@ -202,8 +224,11 @@ export default function RegisterPage() {
           </form>
 
           <p className="mt-8 text-center text-sm text-gray-600">
-            Already have an account?{' '}
-            <Link href="/login" className="font-semibold text-dark-red hover:underline">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="font-semibold text-dark-red hover:underline"
+            >
               Sign In
             </Link>
           </p>
