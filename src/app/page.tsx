@@ -94,15 +94,23 @@ export default function LandingPage() {
         {/* Animated Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a0505] via-[#3d0f0f] to-[#5A1515]">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE0YzAtMS4xLS45LTItMi0yaC00Yy0xLjEgMC0yIC45LTIgMnY0YzAgMS4xLjkgMiAyIDJoNGMxLjEgMCAyLS45IDItMnYtNHptMCAxOGMwLTEuMS0uOS0yLTItMmgtNGMtMS4xIDAtMiAuOS0yIDJ2NGMwIDEuMS45IDIgMiAyaDRjMS4xIDAgMi0uOSAyLTJ2LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30"></div>
-          {/* Subtle gray-blue accent at bottom */}
-          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#dbeafe]/25 via-transparent to-transparent pointer-events-none"></div>
+          {/* Slate blue accent at bottom */}
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-[#3A506B]/30 via-[#1C2143]/10 to-transparent pointer-events-none"></div>
         </div>
 
         {/* Floating Orbs */}
         <div className="absolute top-20 left-10 w-72 h-72 bg-maroon/30 rounded-full blur-3xl animate-pulse"></div>
         <div
+          className="absolute top-40 right-20 w-80 h-80 bg-[#3A506B]/40 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "0.5s" }}
+        ></div>
+        <div
           className="absolute bottom-20 right-10 w-96 h-96 bg-dark-red/20 rounded-full blur-3xl animate-pulse"
           style={{ animationDelay: "1s" }}
+        ></div>
+        <div
+          className="absolute bottom-40 left-20 w-72 h-72 bg-[#1C2143]/35 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "1.5s" }}
         ></div>
 
         {/* Threads Background */}
@@ -131,22 +139,24 @@ export default function LandingPage() {
           style={{ minHeight: "600px" }}
         >
           {/* Animated Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-white text-sm mb-8 animate-fade-in">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-            <span>Join 10,000+ teams already using Nexus</span>
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#3A506B]/40 backdrop-blur-md border-2 border-[#3A506B]/60 rounded-full text-white text-sm mb-8 animate-fade-in shadow-xl shadow-[#3A506B]/40">
+            <span className="w-2.5 h-2.5 bg-[#3A506B] rounded-full animate-pulse shadow-lg shadow-[#3A506B]/80"></span>
+            <span className="font-semibold">
+              Join 10,000+ teams already using Nexus
+            </span>
           </div>
 
           {/* Main Heading with Gradient Text */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold mb-6 sm:mb-8 px-4 leading-tight">
             <span className="block text-white mb-2 animate-slide-up">Work</span>
             <span
-              className="block bg-clip-text text-transparent bg-gradient-to-r from-red-200 via-red-300 to-red-400 animate-slide-up"
+              className="block bg-clip-text text-transparent bg-gradient-to-r from-red-200 via-[#3A506B] to-[#1C2143] animate-slide-up"
               style={{ animationDelay: "0.1s" }}
             >
               Harder
             </span>
             <span
-              className="block text-white/90 text-4xl sm:text-5xl md:text-6xl mt-4 animate-slide-up"
+              className="block text-[#E5E9F0] text-4xl sm:text-5xl md:text-6xl mt-4 animate-slide-up"
               style={{ animationDelay: "0.2s" }}
             >
               Not Smarter
@@ -184,7 +194,7 @@ export default function LandingPage() {
             </StarBorder>
             <Link
               href="/contact"
-              className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-dark-red text-base sm:text-lg w-full sm:w-auto px-10 py-5 rounded-button font-bold transition-all hover:scale-105 ring-1 ring-blue-200/25 hover:ring-blue-200/40"
+              className="bg-[#3A506B] border-2 border-[#1C2143] text-white hover:bg-[#1C2143] hover:border-[#3A506B] text-base sm:text-lg w-full sm:w-auto px-10 py-5 rounded-button font-bold transition-all hover:scale-105 shadow-xl shadow-[#3A506B]/40"
             >
               Book a Demo
             </Link>
@@ -199,26 +209,26 @@ export default function LandingPage() {
               <div className="text-3xl sm:text-4xl font-bold text-white mb-2">
                 10K+
               </div>
-              <div className="text-sm text-gray-300">Active Teams</div>
+              <div className="text-sm text-[#E5E9F0]">Active Teams</div>
             </div>
-            <div className="text-center border-l border-r border-white/20">
+            <div className="text-center border-l border-r border-[#3A506B]/50">
               <div className="text-3xl sm:text-4xl font-bold text-white mb-2">
                 99.9%
               </div>
-              <div className="text-sm text-gray-300">Uptime SLA</div>
+              <div className="text-sm text-[#E5E9F0]">Uptime SLA</div>
             </div>
             <div className="text-center">
               <div className="text-3xl sm:text-4xl font-bold text-white mb-2">
                 500M+
               </div>
-              <div className="text-sm text-gray-300">Messages Sent</div>
+              <div className="text-sm text-[#E5E9F0]">Messages Sent</div>
             </div>
           </div>
 
           {/* Feature Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mt-16 sm:mt-20 md:mt-24 bg-white/5 backdrop-blur-sm p-8 rounded-2xl">
-            <div className="group card text-left hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white">
-              <div className="w-14 h-14 bg-gradient-to-br from-dark-red to-maroon rounded-lg mb-4 flex items-center justify-center group-hover:scale-110 transition-transform">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 mt-16 sm:mt-20 md:mt-24 bg-gradient-to-br from-[#3A506B]/20 to-[#1C2143]/20 backdrop-blur-md p-8 rounded-2xl border-2 border-[#3A506B]/40 shadow-2xl shadow-[#3A506B]/30">
+            <div className="group card text-left hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white hover:border-[#3A506B]/50">
+              <div className="w-14 h-14 bg-gradient-to-br from-[#4A0808] via-dark-red to-[#3A506B] rounded-lg mb-4 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-[#3A506B]/20">
                 <svg
                   className="w-7 h-7 text-white"
                   fill="none"
@@ -242,8 +252,8 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="group card text-left hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white">
-              <div className="w-14 h-14 bg-gradient-to-br from-dark-red to-maroon rounded-lg mb-4 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="group card text-left hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white hover:border-[#3A506B]/50">
+              <div className="w-14 h-14 bg-gradient-to-br from-[#4A0808] via-dark-red to-[#3A506B] rounded-lg mb-4 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-[#3A506B]/20">
                 <svg
                   className="w-7 h-7 text-white"
                   fill="none"
@@ -267,8 +277,8 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="group card text-left hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white">
-              <div className="w-14 h-14 bg-gradient-to-br from-dark-red to-maroon rounded-lg mb-4 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <div className="group card text-left hover:shadow-2xl transition-all duration-300 hover:-translate-y-2 bg-white hover:border-[#3A506B]/50">
+              <div className="w-14 h-14 bg-gradient-to-br from-[#4A0808] via-dark-red to-[#3A506B] rounded-lg mb-4 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-[#3A506B]/20">
                 <svg
                   className="w-7 h-7 text-white"
                   fill="none"
