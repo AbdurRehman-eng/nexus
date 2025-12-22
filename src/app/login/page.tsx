@@ -125,22 +125,23 @@ function LoginForm() {
               Welcome to Nexus
             </h2>
             <p className="text-lg leading-relaxed text-white/80 mb-8">
-              Seamlessly connect, collaborate, and create with your team in real-time.
+              Seamlessly connect, collaborate, and create with your team in
+              real-time.
             </p>
             <div className="space-y-4">
-            <div className="flex items-center gap-3 text-sm text-white/70">
-              <div className="w-2 h-2 bg-white/50 rounded-full"></div>
-              <span>Unified workspace for all communications</span>
+              <div className="flex items-center gap-3 text-sm text-white/70">
+                <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                <span>Unified workspace for all communications</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-white/70">
+                <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                <span>Secure messaging and video calls</span>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-white/70">
+                <div className="w-2 h-2 bg-white/50 rounded-full"></div>
+                <span>AI-powered search and organization</span>
+              </div>
             </div>
-            <div className="flex items-center gap-3 text-sm text-white/70">
-              <div className="w-2 h-2 bg-white/50 rounded-full"></div>
-              <span>Secure messaging and video calls</span>
-            </div>
-            <div className="flex items-center gap-3 text-sm text-white/70">
-              <div className="w-2 h-2 bg-white/50 rounded-full"></div>
-              <span>AI-powered search and organization</span>
-            </div>
-          </div>
           </div>
         </div>
       </div>
