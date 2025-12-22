@@ -17,11 +17,16 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-border px-4 sm:px-6 md:px-8 py-3 sm:py-4">
+    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-4 sm:px-6 md:px-8 py-3 sm:py-4 shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="text-xl sm:text-2xl font-bold text-dark-red flex-shrink-0">
-          NEXUS <span className="text-xs sm:text-sm font-normal text-gray-600">by AKD</span>
+        <Link href="/" className="text-xl sm:text-2xl font-bold flex-shrink-0 group">
+          <span className="bg-gradient-to-r from-dark-red via-maroon to-dark-red bg-clip-text text-transparent">
+            NEXUS
+          </span>
+          <span className="text-xs sm:text-sm font-normal text-gray-500 ml-2 group-hover:text-gray-700 transition-colors">
+            by AKD
+          </span>
         </Link>
 
         {/* Desktop Navigation Links - Hidden on mobile */}
@@ -30,13 +35,16 @@ export default function Navbar() {
             <Link
               key={link.name}
               href={link.href}
-              className={`text-sm font-medium transition-colors ${
+              className={`text-sm font-semibold transition-all duration-200 relative group ${
                 pathname === link.href
                   ? 'text-dark-red'
                   : 'text-gray-700 hover:text-dark-red'
               }`}
             >
               {link.name}
+              <span className={`absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-dark-red to-maroon transition-all duration-200 ${
+                pathname === link.href ? 'w-full' : 'w-0 group-hover:w-full'
+              }`}></span>
             </Link>
           ))}
         </div>
@@ -45,13 +53,13 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-3 sm:gap-4 flex-shrink-0">
           <Link
             href="/login"
-            className="text-xs sm:text-sm font-medium text-gray-700 hover:text-dark-red transition-colors"
+            className="text-xs sm:text-sm font-semibold text-gray-700 hover:text-dark-red transition-all duration-200 px-4 py-2 rounded-button hover:bg-gray-50"
           >
             Login
           </Link>
           <Link
             href="/register"
-            className="btn-primary text-xs sm:text-sm px-3 sm:px-4 py-2"
+            className="bg-gradient-to-r from-dark-red to-maroon hover:from-maroon hover:to-dark-red text-white text-xs sm:text-sm font-bold px-4 sm:px-6 py-2 sm:py-2.5 rounded-button transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105"
           >
             Get Started
           </Link>
@@ -61,13 +69,13 @@ export default function Navbar() {
         <div className="flex md:hidden items-center gap-2">
           <Link
             href="/login"
-            className="text-xs font-medium text-gray-700 hover:text-dark-red transition-colors"
+            className="text-xs font-medium text-gray-700 hover:text-dark-red transition-colors px-2 py-1"
           >
             Login
           </Link>
           <Link
             href="/register"
-            className="btn-primary text-xs px-3 py-1.5"
+            className="bg-gradient-to-r from-dark-red to-maroon text-white text-xs font-bold px-3 py-1.5 rounded-button shadow-sm"
           >
             Get Started
           </Link>
