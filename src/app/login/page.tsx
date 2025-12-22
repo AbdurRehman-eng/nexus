@@ -100,17 +100,39 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-dark-red to-maroon text-white p-16 flex-col justify-center">
-        <h1 className="text-5xl font-bold mb-6">WELCOME TO NEXUS</h1>
-        <p className="text-xl leading-relaxed">
-          Work smarter, not harder. Collaborate with your team and manage everything in one place.
-        </p>
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#3d0f0f] via-[#5A1515] to-[#7A2A2A] text-white p-16 flex-col justify-center relative overflow-hidden">
+        {/* Gradient Background Effect */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
+        
+        <div className="relative z-10">
+          <h1 className="text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-200 leading-tight tracking-tight">
+            Welcome to Nexus
+          </h1>
+          <p className="text-lg leading-relaxed text-gray-100 max-w-md animate-fade-in">
+            Seamlessly connect, collaborate, and create with your team in real-time.
+          </p>
+          <div className="mt-8 space-y-3">
+            <div className="flex items-center gap-3 text-sm text-gray-200">
+              <div className="w-2 h-2 bg-white rounded-full"></div>
+              <span>Unified workspace for all communications</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-200">
+              <div className="w-2 h-2 bg-white rounded-full"></div>
+              <span>Secure messaging and video calls</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-gray-200">
+              <div className="w-2 h-2 bg-white rounded-full"></div>
+              <span>AI-powered search and organization</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Right Side - Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          <h2 className="text-3xl font-bold text-dark-red mb-8">Sign In</h2>
+          <h2 className="text-3xl font-bold text-dark-red mb-8 text-center">Sign In</h2>
           
           <form onSubmit={handleLogin} className="space-y-6">
             {error && (
