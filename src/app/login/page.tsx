@@ -103,40 +103,52 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#3d0f0f] via-[#5A1515] to-[#7A2A2A] text-white p-16 flex-col justify-center relative overflow-hidden">
-        {/* Gradient Background Effect */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl"></div>
-
+      <div className="hidden lg:flex lg:w-1/2 bg-[#4A0808] text-white p-12 flex-col relative overflow-hidden">
+        {/* Logo at top */}
         <div className="relative z-10">
-          <h1 className="text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-200 leading-tight tracking-tight">
-            Welcome to Nexus
-          </h1>
-          <p className="text-lg leading-relaxed text-gray-100 max-w-md animate-fade-in">
-            Seamlessly connect, collaborate, and create with your team in
-            real-time.
-          </p>
-          <div className="mt-8 space-y-3">
-            <div className="flex items-center gap-3 text-sm text-gray-200">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center">
+              <div className="w-6 h-6 bg-gradient-to-br from-white to-gray-200 rounded"></div>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-white">NEXUS</h1>
+              <p className="text-xs text-white/70">by AKD</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Content centered vertically */}
+        <div className="flex-1 flex flex-col justify-center relative z-10 max-w-lg">
+          {/* Single Card for All Content */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/10">
+            <h2 className="text-5xl font-bold mb-6 text-white leading-tight">
+              Welcome to Nexus
+            </h2>
+            <p className="text-lg leading-relaxed text-white/80 mb-8">
+              Seamlessly connect, collaborate, and create with your team in real-time.
+            </p>
+            <div className="space-y-4">
+            <div className="flex items-center gap-3 text-sm text-white/70">
+              <div className="w-2 h-2 bg-white/50 rounded-full"></div>
               <span>Unified workspace for all communications</span>
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-200">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
+            <div className="flex items-center gap-3 text-sm text-white/70">
+              <div className="w-2 h-2 bg-white/50 rounded-full"></div>
               <span>Secure messaging and video calls</span>
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-200">
-              <div className="w-2 h-2 bg-white rounded-full"></div>
+            <div className="flex items-center gap-3 text-sm text-white/70">
+              <div className="w-2 h-2 bg-white/50 rounded-full"></div>
               <span>AI-powered search and organization</span>
             </div>
+          </div>
           </div>
         </div>
       </div>
 
       {/* Right Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
-        <div className="w-full max-w-md">
-          <h2 className="text-3xl font-bold text-dark-red mb-8 text-center">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-[#E5E9F0]">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 sm:p-10">
+          <h2 className="text-3xl font-bold text-[#1C2143] mb-8 text-center">
             Sign In
           </h2>
 
@@ -239,7 +251,7 @@ function LoginForm() {
 
             <button
               type="submit"
-              className="btn-primary w-full"
+              className="bg-[#1C2143] hover:bg-[#3A506B] text-white w-full py-3 rounded-lg font-semibold transition-all"
               disabled={loading}
             >
               {loading ? "Signing In..." : "Sign In"}

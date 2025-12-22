@@ -1,26 +1,29 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { name: 'Homepage', href: '/homepage' },
-    { name: 'Solutions', href: '/solutions' },
-    { name: 'Resources', href: '/resources' },
-    { name: 'About Us', href: '/about' },
-    { name: 'Contact Us', href: '/contact' },
+    { name: "Homepage", href: "/homepage" },
+    { name: "Solutions", href: "/solutions" },
+    { name: "Resources", href: "/resources" },
+    { name: "About Us", href: "/about" },
+    { name: "Contact Us", href: "/contact" },
   ];
 
   return (
     <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-4 sm:px-6 md:px-8 py-3 sm:py-4 shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
-        <Link href="/" className="text-xl sm:text-2xl font-bold flex-shrink-0 group">
+        <Link
+          href="/"
+          className="text-xl sm:text-2xl font-bold flex-shrink-0 group"
+        >
           <span className="bg-gradient-to-r from-dark-red via-maroon to-dark-red bg-clip-text text-transparent">
             NEXUS
           </span>
@@ -37,14 +40,16 @@ export default function Navbar() {
               href={link.href}
               className={`text-sm font-semibold transition-all duration-200 relative group ${
                 pathname === link.href
-                  ? 'text-dark-red'
-                  : 'text-gray-700 hover:text-dark-red'
+                  ? "text-dark-red"
+                  : "text-gray-700 hover:text-dark-red"
               }`}
             >
               {link.name}
-              <span className={`absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-dark-red to-maroon transition-all duration-200 ${
-                pathname === link.href ? 'w-full' : 'w-0 group-hover:w-full'
-              }`}></span>
+              <span
+                className={`absolute -bottom-1 left-0 h-0.5 bg-gradient-to-r from-dark-red to-maroon transition-all duration-200 ${
+                  pathname === link.href ? "w-full" : "w-0 group-hover:w-full"
+                }`}
+              ></span>
             </Link>
           ))}
         </div>
@@ -123,8 +128,8 @@ export default function Navbar() {
                 onClick={() => setMobileMenuOpen(false)}
                 className={`text-sm font-medium transition-colors px-2 py-1 ${
                   pathname === link.href
-                    ? 'text-dark-red'
-                    : 'text-gray-700 hover:text-dark-red'
+                    ? "text-dark-red"
+                    : "text-gray-700 hover:text-dark-red"
                 }`}
               >
                 {link.name}
@@ -136,4 +141,3 @@ export default function Navbar() {
     </nav>
   );
 }
-
