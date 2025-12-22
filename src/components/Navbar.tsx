@@ -8,6 +8,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  //adding the navigation links
   const navLinks = [
     { name: "Homepage", href: "/homepage" },
     { name: "Solutions", href: "/solutions" },
