@@ -55,7 +55,7 @@ export default function ContactPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Left Side - Contact Info */}
           <div>
-            <h1 className="text-5xl font-bold text-dark-red mb-6">Get in Touch</h1>
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-[#4A0808] to-[#3A506B] bg-clip-text text-transparent mb-6">Get in Touch</h1>
             <p className="text-lg text-gray-700 mb-8">
               Have questions or feedback? We'd love to hear from you. Send us a message and we'll
               respond as soon as possible.
@@ -63,7 +63,7 @@ export default function ContactPage() {
 
             <div className="space-y-6">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-dark-red rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-gradient-to-br from-[#3A506B] to-[#1C2143] rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
@@ -75,7 +75,7 @@ export default function ContactPage() {
               </div>
 
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-dark-red rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-gradient-to-br from-[#3A506B] to-[#1C2143] rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -91,7 +91,7 @@ export default function ContactPage() {
               </div>
 
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-dark-red rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-gradient-to-br from-[#3A506B] to-[#1C2143] rounded-lg flex items-center justify-center flex-shrink-0">
                   <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -109,7 +109,7 @@ export default function ContactPage() {
 
           {/* Right Side - Contact Form */}
           <div className="card">
-            <h2 className="text-2xl font-bold text-dark-red mb-6">Send us a Message</h2>
+            <h2 className="text-2xl font-bold text-[#1C2143] mb-6">Send us a Message</h2>
 
             {isSubmitted ? (
               <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
@@ -196,7 +196,7 @@ export default function ContactPage() {
 
                 <button 
                   type="submit" 
-                  className="btn-primary w-full" 
+                  className="bg-[#1C2143] hover:bg-[#3A506B] text-white font-semibold px-6 py-3 rounded-button w-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
                   disabled={loading}
                 >
                   {loading ? 'Sending...' : 'Send Message'}

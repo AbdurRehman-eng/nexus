@@ -9,8 +9,12 @@ export default function SolutionsPage() {
       
       <main className="flex-grow">
         {/* Hero Section */}
-        <section className="bg-gradient-to-br from-dark-red to-maroon text-white py-16 sm:py-20 md:py-24">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8 text-center">
+        <section className="bg-gradient-to-br from-[#6B1212] via-[#4A0808] to-[#2D0505] text-white py-16 sm:py-20 md:py-24 relative overflow-hidden">
+          {/* Decorative blue orbs */}
+          <div className="absolute top-20 right-20 w-32 h-32 bg-[#3A506B] rounded-full blur-3xl opacity-30"></div>
+          <div className="absolute bottom-20 left-20 w-40 h-40 bg-[#1C2143] rounded-full blur-3xl opacity-20"></div>
+          
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 md:px-8 text-center relative z-10">
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6">
               Solutions for Every Team
             </h1>
@@ -25,8 +29,8 @@ export default function SolutionsPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-12">
               {/* Small Teams */}
-              <div className="bg-white border-2 border-gray-200 rounded-lg p-8 hover:border-dark-red transition-colors">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-6">
+              <div className="bg-white border-2 border-gray-200 rounded-lg p-8 hover:border-[#3A506B] transition-colors">
+                <div className="w-12 h-12 bg-gradient-to-br from-[#3A506B] to-[#1C2143] rounded-lg flex items-center justify-center mb-6">
                   <svg className="w-6 h-6 text-dark-red" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
@@ -37,38 +41,38 @@ export default function SolutionsPage() {
                 </p>
                 <ul className="space-y-3 mb-8">
                   <li className="flex items-start">
-                    <svg className="w-5 h-5 text-dark-red mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-[#3A506B] mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-gray-700">Up to 10 team members</span>
                   </li>
                   <li className="flex items-start">
-                    <svg className="w-5 h-5 text-dark-red mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-[#3A506B] mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-gray-700">Unlimited channels</span>
                   </li>
                   <li className="flex items-start">
-                    <svg className="w-5 h-5 text-dark-red mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-[#3A506B] mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-gray-700">Video calls & screen sharing</span>
                   </li>
                   <li className="flex items-start">
-                    <svg className="w-5 h-5 text-dark-red mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-[#3A506B] mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                     <span className="text-gray-700">File sharing & storage</span>
                   </li>
                 </ul>
-                <Link href="/register" className="btn-primary w-full text-center block">
+                <Link href="/register" className="bg-[#1C2143] hover:bg-[#3A506B] text-white font-semibold px-6 py-3 rounded-button w-full text-center block transition-colors">
                   Get Started Free
                 </Link>
               </div>
 
               {/* Enterprise */}
               <div className="bg-gradient-to-br from-dark-red to-maroon text-white rounded-lg p-8 relative overflow-hidden">
-                <div className="absolute top-4 right-4 bg-white text-dark-red text-xs font-bold px-3 py-1 rounded-full">
+                <div className="absolute top-4 right-4 bg-[#3A506B] text-white text-xs font-bold px-3 py-1 rounded-full">
                   POPULAR
                 </div>
                 <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center mb-6">
