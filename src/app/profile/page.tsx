@@ -202,7 +202,7 @@ export default function ProfilePage() {
       <nav className="bg-white border-b border-gray-border px-4 sm:px-6 md:px-8 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/homepage" className="text-xl sm:text-2xl font-bold text-dark-red">
-            NEXUS <span className="text-xs sm:text-sm font-normal text-gray-600">by AKD</span>
+            NEXUS <span className="text-xs sm:text-sm font-normal text-gray-600">by ARD</span>
           </Link>
           <Link href="/homepage" className="text-xs sm:text-sm text-gray-700 hover:text-dark-red">
             Back to Dashboard

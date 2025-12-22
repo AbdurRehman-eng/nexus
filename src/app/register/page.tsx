@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signInWithGoogle } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/client";
+import NexusLogo from "@/components/NexusLogo";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -100,11 +101,11 @@ export default function RegisterPage() {
         <div className="relative z-10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center">
-              <div className="w-6 h-6 bg-gradient-to-br from-white to-gray-200 rounded"></div>
+              <NexusLogo className="w-6 h-6" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-white">NEXUS</h1>
-              <p className="text-xs text-white/70">by AKD</p>
+              <p className="text-xs text-white/70">by ARD</p>
             </div>
           </div>
         </div>

@@ -17,7 +17,7 @@ export default function Navbar() {
   ];
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-4 sm:px-6 md:px-8 py-3 sm:py-4 shadow-sm">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200/50 px-4 sm:px-6 md:px-8 py-3 sm:py-4 shadow-sm">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link
@@ -28,7 +28,7 @@ export default function Navbar() {
             NEXUS
           </span>
           <span className="text-xs sm:text-sm font-normal text-gray-500 ml-2 group-hover:text-gray-700 transition-colors">
-            by AKD
+            by ARD
           </span>
         </Link>
 
