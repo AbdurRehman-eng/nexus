@@ -1,5 +1,6 @@
 "use client";
 
+// Navbar component with responsive design and navigation links
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -8,7 +9,7 @@ export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  //adding the navigation links
+  //adding the navigation links 
   const navLinks = [
     { name: "Homepage", href: "/homepage" },
     { name: "Solutions", href: "/solutions" },
