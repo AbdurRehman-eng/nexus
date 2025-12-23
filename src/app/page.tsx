@@ -90,7 +90,7 @@ export default function LandingPage() {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="flex-grow relative overflow-hidden">
+      <section className="flex-grow relative overflow-hidden pt-0">
         {/* Animated Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#1a0505] via-[#3d0f0f] to-[#5A1515]">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE0YzAtMS4xLS45LTItMi0yaC00Yy0xLjEgMC0yIC45LTIgMnY0YzAgMS4xLjkgMiAyIDJoNGMxLjEgMCAyLS45IDItMnYtNHptMCAxOGMwLTEuMS0uOS0yLTItMmgtNGMtMS4xIDAtMiAuOS0yIDJ2NGMwIDEuMS45IDIgMiAyaDRjMS4xIDAgMi0uOSAyLTJ2LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30"></div>
@@ -129,23 +129,15 @@ export default function LandingPage() {
             amplitude={1}
             distance={0}
             enableMouseInteraction={true}
-            color={[0.8, 0.2, 0.2]}
+            color={[1, 1, 1]}
           />
         </div>
 
         {/* Content Overlay */}
         <div
-          className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pt-[20vh] pb-12 sm:pb-16 md:pb-20 text-center"
+          className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 md:px-8 pt-24 sm:pt-28 md:pt-32 pb-12 sm:pb-16 md:pb-20 text-center"
           style={{ minHeight: "600px" }}
         >
-          {/* Animated Badge */}
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#3A506B]/40 backdrop-blur-md border-2 border-[#3A506B]/60 rounded-full text-white text-sm mb-8 animate-fade-in shadow-xl shadow-[#3A506B]/40">
-            <span className="w-2.5 h-2.5 bg-[#3A506B] rounded-full animate-pulse shadow-lg shadow-[#3A506B]/80"></span>
-            <span className="font-semibold">
-              Join 10,000+ teams already using Nexus
-            </span>
-          </div>
-
           {/* Main Heading with Gradient Text */}
           <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold mb-6 sm:mb-8 px-4 leading-tight">
             <span className="block text-white mb-2 animate-slide-up">Work</span>
@@ -153,13 +145,13 @@ export default function LandingPage() {
               className="block bg-clip-text text-transparent bg-gradient-to-r from-red-200 via-[#3A506B] to-[#1C2143] animate-slide-up"
               style={{ animationDelay: "0.1s" }}
             >
-              Harder
+              Smarter
             </span>
             <span
               className="block text-[#E5E9F0] text-4xl sm:text-5xl md:text-6xl mt-4 animate-slide-up"
               style={{ animationDelay: "0.2s" }}
             >
-              Not Smarter
+              Not Harder
             </span>
           </h1>
 

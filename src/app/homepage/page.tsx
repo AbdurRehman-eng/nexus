@@ -100,7 +100,7 @@ export default function Homepage() {
           >
             <span className="text-white">NEXUS</span>
             <span className="text-xs sm:text-sm font-normal text-[#E5E9F0]">
-              by AKD
+              by ARD
             </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-4">

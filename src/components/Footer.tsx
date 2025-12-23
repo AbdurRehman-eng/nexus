@@ -10,7 +10,7 @@ export default function Footer() {
           {/* Brand Section */}
           <div className="col-span-1 sm:col-span-2 lg:col-span-1">
             <Link href="/" className="text-2xl font-bold text-dark-red inline-block mb-4">
-              NEXUS <span className="text-sm font-normal text-gray-600">by AKD</span>
+              NEXUS <span className="text-sm font-normal text-gray-600">by ARD</span>
             </Link>
             <p className="text-gray-600 text-sm mb-4">
               Work smarter, not harder. The all-in-one collaboration platform for modern teams.
@@ -92,7 +92,7 @@ export default function Footer() {
         <div className="pt-8 border-t border-gray-border">
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <p className="text-gray-600 text-sm text-center sm:text-left">
-              © {currentYear} NEXUS by AKD. All rights reserved.
+              © {currentYear} NEXUS by ARD. All rights reserved.
             </p>
             <div className="flex gap-6">
               <Link href="/privacy" className="text-gray-600 hover:text-dark-red transition-colors text-sm">
