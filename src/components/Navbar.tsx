@@ -27,7 +27,7 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [isLandingPage]);
 
-  //adding the navigation links 
+  //adding the navigation links here
   const navLinks = [
     { name: "Homepage", href: "/homepage" },
     { name: "Solutions", href: "/solutions" },
